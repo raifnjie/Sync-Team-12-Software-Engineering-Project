@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
-/* Our own colors. Tailwind turns these into classes like bg-brand and text-brand */
+
 @theme {
+  /* The theme colour */
   --color-brand: #7c3aed;
   --color-brand-dark: #1a3f93;
 }
 
-/* Normal CSS for the whole page */
+
 body {
   margin: 0;
   background: #fafafa;
   color: #1a1a1a;
+  /* The chosen font-family */
   font-family: "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
 }
