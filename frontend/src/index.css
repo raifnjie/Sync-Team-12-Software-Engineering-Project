@@ -2,7 +2,7 @@
 
 /* Our own colors. Tailwind turns these into classes like bg-brand and text-brand */
 @theme {
-  --color-brand: #2250b8;
+  --color-brand: #7c3aed;
   --color-brand-dark: #1a3f93;
 }
 

@@ -9,12 +9,12 @@ const recommended: Course[] = [
   { code: "CSC 3320", name: "Systems Programming" },
   { code: "MATH 2420", name: "Discrete Math" },
   { code: "MATH 3350", name: "Software Engineering" },
-  { code: "MATH 4320", name: "Operating Systems" },
+  { code: "MATH 3020", name: "Applied Probability and Statistics for Computer Science" },
 ];
 
 const upcoming = [
   "Registration opens - Oct 20",
-  "Advisor comment on plan",
+  "Advisor commented on your plan",
   "Internship deadline - Oct 18",
 ];
 
@@ -38,7 +38,8 @@ function StatCard({ label, value, sub, children }: StatCardProps) {
 }
 
 export default function DashboardPage() {
-  const progress = 62; // percent
+  const progress = 80; // percent
+  const studentName = "Mike";
   // List of course codes the user clicked "Add to plan" on
   const [added, setAdded] = useState<string[]>([]);
 
@@ -51,7 +52,7 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="mx-auto max-w-250 p-6">
-        <h1 className="mb-4 text-lg font-bold">Welcome back, Jordan</h1>
+        <h1 className="mb-4 text-lg font-bold">Welcome back, {studentName}!</h1>
 
         {/* 2 columns on phones, 4 on bigger screens (md:) */}
         <section aria-label="Summary" className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -66,14 +67,15 @@ export default function DashboardPage() {
               <div className="h-full bg-brand" style={{ width: `${progress}%` }} />
             </div>
           </StatCard>
-          <StatCard label="Expected graduation" value="Spring 2028" sub="On track" />
-          <StatCard label="Next deadline" value="Internship app" sub="Due in 9 days" />
-          <StatCard label="Credit hours" value="74 / 120" />
+          <StatCard label="Expected graduation" value="Spring 2027" sub="On track" />
+          <StatCard label="Next deadline" value="Internship application" sub="Due in 9 days" />
+          <StatCard label="Credit hours" value="100 / 120" />
         </section>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr]">
           <section className="rounded-md border border-gray-200 bg-white px-4 py-3.5">
             <p className="mb-1.5 text-[11px] text-gray-500">Recommended next courses</p>
+            <p className="text-xs text-gray-500">{added.length} courses added</p>
 
             {/* .map() makes one row for every course in the list */}
             {recommended.map((course) => {
