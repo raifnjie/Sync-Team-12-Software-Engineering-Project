@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from "react";
 import Navbar from "../components/navbar";
 
-// A "type" describes the shape of our data
+/* set the type of values for the course code and the course name */
 type Course = { code: string; name: string };
 
-// Fake data for now. Later this will come from the backend.
+/* The following list of courses on the dashboard */
 const recommended: Course[] = [
   { code: "CSC 3320", name: "Systems Programming" },
   { code: "MATH 2420", name: "Discrete Math" },
@@ -12,18 +12,18 @@ const recommended: Course[] = [
   { code: "MATH 3020", name: "Applied Probability and Statistics for Computer Science" },
 ];
 
+/* The announcements bar */
 const upcoming = [
   "Registration opens - Oct 20",
   "Advisor commented on your plan",
   "Internship deadline - Oct 18",
 ];
 
-// A small reusable card. "Props" are the values we pass in, like HTML attributes.
 type StatCardProps = {
   label: string;
   value: string;
-  sub?: string; // the ? means this one is optional
-  children?: ReactNode; // anything placed between the card's tags
+  sub?: string; 
+  children?: ReactNode; 
 };
 
 function StatCard({ label, value, sub, children }: StatCardProps) {
@@ -38,13 +38,13 @@ function StatCard({ label, value, sub, children }: StatCardProps) {
 }
 
 export default function DashboardPage() {
-  const progress = 80; // percent
+  // Student's details
+  const progress = 83; 
   const studentName = "Mike";
-  // List of course codes the user clicked "Add to plan" on
   const [added, setAdded] = useState<string[]>([]);
 
   function addToPlan(code: string) {
-    setAdded([...added, code]); // make a new list with the new code at the end
+    setAdded([...added, code]); 
   }
 
   return (
@@ -54,7 +54,7 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-250 p-6">
         <h1 className="mb-4 text-lg font-bold">Welcome back, {studentName}!</h1>
 
-        {/* 2 columns on phones, 4 on bigger screens (md:) */}
+        {}
         <section aria-label="Summary" className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="Degree progress" value={`${progress}%`}>
             <div
@@ -67,6 +67,7 @@ export default function DashboardPage() {
               <div className="h-full bg-brand" style={{ width: `${progress}%` }} />
             </div>
           </StatCard>
+          {/* Add the different expected graduation, and the current credit hours */}
           <StatCard label="Expected graduation" value="Spring 2027" sub="On track" />
           <StatCard label="Next deadline" value="Internship application" sub="Due in 9 days" />
           <StatCard label="Credit hours" value="100 / 120" />
@@ -77,7 +78,7 @@ export default function DashboardPage() {
             <p className="mb-1.5 text-[11px] text-gray-500">Recommended next courses</p>
             <p className="text-xs text-gray-500">{added.length} courses added</p>
 
-            {/* .map() makes one row for every course in the list */}
+            {}
             {recommended.map((course) => {
               const isAdded = added.includes(course.code);
               return (

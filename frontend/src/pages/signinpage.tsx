@@ -1,22 +1,19 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
-// One shared style for all three text boxes
 const inputClass =
   "w-full rounded border border-gray-200 bg-white px-3 py-2.5 focus:border-brand focus:outline-2 focus:outline-brand";
 
 export default function SignInPage() {
-  // State = values React remembers. When they change, the page updates.
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const navigate = useNavigate(); // lets us change pages with code
+  const navigate = useNavigate(); 
 
   function handleSubmit(e: FormEvent) {
-    e.preventDefault(); // stop the browser from reloading the page
-    // Later: send { name, email, password } to the backend here.
+    e.preventDefault(); 
     navigate("/dashboard");
   }
 
@@ -29,8 +26,9 @@ export default function SignInPage() {
         </p>
 
         <form onSubmit={handleSubmit}>
-          {/* Only shows when isSignUp is true */}
+          {}
           {isSignUp && (
+            // The user types their full  name to create an account
             <div className="mb-4">
               <label htmlFor="name" className="mb-1 block text-xs text-gray-500">
                 Full name
@@ -46,7 +44,7 @@ export default function SignInPage() {
               />
             </div>
           )}
-
+          {/* The email field */}
           <div className="mb-4">
             <label htmlFor="email" className="mb-1 block text-xs text-gray-500">
               Email
@@ -62,7 +60,7 @@ export default function SignInPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-
+          {/* The password field */}
           <div className="mb-4">
             <label htmlFor="password" className="mb-1 block text-xs text-gray-500">
               Password
@@ -107,7 +105,7 @@ export default function SignInPage() {
             {isSignUp ? "Log in" : "Create an account"}
           </button>
         </p>
-
+          {}
         <div className="rounded border border-dashed border-gray-300 p-2.5 text-center text-[11px] text-gray-500">
           Role selected automatically: Student &middot; Advisor &middot; Admin
         </div>
