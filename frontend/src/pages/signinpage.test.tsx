@@ -3,9 +3,11 @@ import { MemoryRouter } from "react-router-dom";
 import { test, expect } from "vitest";
 import SignInPage from "./signinpage";
 
+// Test to check that Account Creation and Signing in to account is showing
+
 // Test 1: Verify the sign-in form is displayed when the page first loads
 test("renders sign in form by default", () => {
-  // Render the SignInPage wrapped in a router (needed because it uses useNavigate)
+  // Render the SignInPage wrapped in a router
   render(
     <MemoryRouter>
       <SignInPage />
