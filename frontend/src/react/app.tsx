@@ -3,7 +3,7 @@ import SignInPage from "../pages/signinpage";
 import DashboardPage from "../pages/dashboardpage";
 import TimelinePage from "../pages/timelinepage";
 
-// Shown for pages we have not built yet (Progress, Map, Plan...)
+// The default result on every page not currently built out.
 function ComingSoon() {
   return (
     <div className="p-6">
@@ -15,7 +15,6 @@ function ComingSoon() {
   );
 }
 
-// The router decides which page to show based on the URL
 export default function App() {
   return (
     <BrowserRouter>
