@@ -10,14 +10,18 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

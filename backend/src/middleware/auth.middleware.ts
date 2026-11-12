@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
+import { config } from "../config";
 
 // Allowed user roles matching the architecture document (ARCHITECTURE.md)
 export type UserRole = "student" | "advisor" | "admin";
@@ -20,8 +21,8 @@ declare global {
   }
 }
 
-// Secret key used to sign and verify JWTs. In production, load this from .env
-const JWT_SECRET = process.env.JWT_SECRET || "sync_dev_secret_change_in_production";
+// Secret key from centralized config
+const JWT_SECRET = config.jwtSecret;
 
 /**
  * Authentication Middleware:
