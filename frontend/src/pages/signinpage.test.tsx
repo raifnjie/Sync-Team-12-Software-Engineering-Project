@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, test } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import SignInPage from "./signinpage";
@@ -27,8 +27,21 @@ describe("SignInPage", () => {
     localStorage.clear();
   });
 
+  // Test 1: Verify default sign in form renders
+  test("renders sign in form by default", () => {
+    renderLoginPage();
+    expect(screen.getByRole("button", { name: "Log In" })).toBeInTheDocument();
+  });
+
+  // Test 2: Verify switching from Sign In mode to Sign Up mode
+  test("shows full name field when clicking create account", () => {
+    renderLoginPage();
+    fireEvent.click(screen.getByRole("button", { name: /create an account/i }));
+    expect(screen.getByPlaceholderText(/jordan smith/i)).toBeInTheDocument();
+  });
+
+  // Test 3: Bad email validation error
   it("shows an error and does not log in when the email is invalid", () => {
-    /* Test that a badly formatted email is rejected */
     renderLoginPage();
     fillAndSubmit("not-an-email", "password123");
 
@@ -36,8 +49,8 @@ describe("SignInPage", () => {
     expect(localStorage.getItem("sync_user")).toBeNull();
   });
 
+  // Test 4: Successful login navigation and storage
   it("logs the user in and opens the dashboard when the form is valid", async () => {
-    /* Test that valid details save the user and go to the dashboard */
     renderLoginPage();
     fillAndSubmit("mike.smith@gsu.edu", "password123");
 
