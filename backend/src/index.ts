@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { config } from "./config";
+import { healthRouter } from "./routes/health.routes";
 import { protectedRouter } from "./routes/protected.routes";
 import { generateToken } from "./middleware/auth.middleware";
 
@@ -28,16 +29,10 @@ app.use(
 app.use(express.json());
 
 /**
- * 3. Public Health Check Endpoint (/api/health):
- * Allows monitoring tools or frontend pinging to verify server status.
+ * 3. Mount Public Health Check Routes:
+ * GET /api/health
  */
-app.get("/api/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    environment: config.nodeEnv,
-  });
-});
+app.use("/api", healthRouter);
 
 /**
  * 4. Sample Public Auth Route (/api/auth/demo-token):
