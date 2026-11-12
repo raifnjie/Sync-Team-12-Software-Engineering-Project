@@ -1,35 +1,62 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { test, expect } from "vitest";
+import { afterEach, describe, expect, it, test } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import SignInPage from "./signinpage";
 
-// Test to check that Account Creation and Signing in to account is showing
-
-// Test 1: Verify the sign-in form is displayed when the page first loads
-test("renders sign in form by default", () => {
-  // Render the SignInPage wrapped in a router
+/* Opens the log in page, with a stand-in dashboard page to land on after logging in */
+function renderLoginPage() {
   render(
-    <MemoryRouter>
-      <SignInPage />
+    <MemoryRouter initialEntries={["/login"]}>
+      <Routes>
+        <Route path="/login" element={<SignInPage />} />
+        <Route path="/dashboard" element={<p>Dashboard page</p>} />
+      </Routes>
     </MemoryRouter>
   );
+}
 
-  // Check that the "Log In" submit button exists on the screen
-  expect(screen.getByRole("button", { name: /log in/i })).toBeInTheDocument();
-});
+function fillAndSubmit(email: string, password: string) {
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: email } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: password } });
+  fireEvent.click(screen.getByRole("button", { name: "Log In" }));
+}
 
-// Test 2: Verify switching from Sign In mode to Sign Up mode
-test("shows full name field when clicking create account", () => {
-  // Render the component
-  render(
-    <MemoryRouter>
-      <SignInPage />
-    </MemoryRouter>
-  );
+describe("SignInPage", () => {
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
 
-  // Simulate user clicking the "Create an account" toggle button
-  fireEvent.click(screen.getByRole("button", { name: /create an account/i }));
+  // Test 1: Verify default sign in form renders
+  test("renders sign in form by default", () => {
+    renderLoginPage();
+    expect(screen.getByRole("button", { name: "Log In" })).toBeInTheDocument();
+  });
 
-  // Check that the "Full name" input (placeholder "Jordan Smith") now appears
-  expect(screen.getByPlaceholderText(/jordan smith/i)).toBeInTheDocument();
+  // Test 2: Verify switching from Sign In mode to Sign Up mode
+  test("shows full name field when clicking create account", () => {
+    renderLoginPage();
+    fireEvent.click(screen.getByRole("button", { name: /create an account/i }));
+    expect(screen.getByPlaceholderText(/jordan smith/i)).toBeInTheDocument();
+  });
+
+  // Test 3: Bad email validation error
+  it("shows an error and does not log in when the email is invalid", () => {
+    renderLoginPage();
+    fillAndSubmit("not-an-email", "password123");
+
+    expect(screen.getByText("Enter a valid email, like you@gsu.edu.")).toBeTruthy();
+    expect(localStorage.getItem("sync_user")).toBeNull();
+  });
+
+  // Test 4: Successful login navigation and storage
+  it("logs the user in and opens the dashboard when the form is valid", async () => {
+    renderLoginPage();
+    fillAndSubmit("mike.smith@gsu.edu", "password123");
+
+    expect(await screen.findByText("Dashboard page")).toBeTruthy();
+    const saved = JSON.parse(localStorage.getItem("sync_user") ?? "{}");
+    expect(saved.name).toBe("Mike");
+    expect(saved.email).toBe("mike.smith@gsu.edu");
+  });
 });

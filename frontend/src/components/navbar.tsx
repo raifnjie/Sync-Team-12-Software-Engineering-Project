@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 
-// The links in the top bar. To add a page, add one line here.
+/* The Navigation bar links */
 const links = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/progress", label: "Progress" },
@@ -12,7 +12,9 @@ const links = [
 
 export default function Navbar() {
   return (
+    
     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-6 py-3.5">
+      {/* The app name */}
       <Link to="/dashboard" className="text-base font-bold text-gray-900">
         Sync
       </Link>
@@ -22,7 +24,6 @@ export default function Navbar() {
         className="order-3 flex w-full gap-5 overflow-x-auto md:order-none md:w-auto"
       >
         {links.map((link) => (
-          // NavLink tells us if this link matches the current page (isActive)
           <NavLink
             key={link.to}
             to={link.to}
