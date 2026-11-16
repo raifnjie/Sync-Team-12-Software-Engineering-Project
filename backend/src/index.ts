@@ -4,7 +4,13 @@ import { config } from "./config";
 import { healthRouter } from "./routes/health.routes";
 import { protectedRouter } from "./routes/protected.routes";
 import { recommendationsRouter } from "./routes/recommendations.routes";
+import { authRouter } from "./routes/auth.routes";
+import { plansRouter } from "./routes/plans.routes";
+import { progressRouter } from "./routes/progress.routes";
+import { recordsRouter } from "./routes/records.routes";
+import { opportunitiesRouter } from "./routes/opportunities.routes";
 import { generateToken } from "./middleware/auth.middleware";
+import { errorHandler } from "./http";
 
 // Initialize the Express backend application
 const app = express();
@@ -36,14 +42,21 @@ app.use(express.json());
 app.use("/api", healthRouter);
 
 /**
- * 4. Sample Public Auth Route (/api/auth/demo-token):
- * Helper endpoint for testing that issues signed JWTs for different roles.
+ * 4. Accounts: register, log in, forgot password, current user (/api/auth/...)
  */
-app.post("/api/auth/demo-token", (req, res) => {
-  const { email = "student@gsu.edu", role = "student", id = "usr-1" } = req.body || {};
-  const token = generateToken({ id, email, role });
-  res.json({ token, role, email });
-});
+app.use("/api", authRouter);
+
+/**
+ * Development-only helper that issues a signed JWT for any role, for trying
+ * role-protected routes. Never available in production.
+ */
+if (config.nodeEnv !== "production") {
+  app.post("/api/auth/demo-token", (req, res) => {
+    const { email = "student@gsu.edu", role = "student", id = "usr-1" } = req.body || {};
+    const token = generateToken({ id, email, role });
+    res.json({ token, role, email });
+  });
+}
 
 /**
  * 5. Mount Protected Routes:
@@ -56,6 +69,22 @@ app.use("/api", protectedRouter);
  * GET/PATCH/POST/DELETE /api/recommendations/:studentId/...
  */
 app.use("/api", recommendationsRouter);
+
+/**
+ * 7. Student data: degree plan, progress and timeline, academic record, saved opportunities
+ */
+app.use("/api", plansRouter);
+app.use("/api", progressRouter);
+app.use("/api", recordsRouter);
+app.use("/api", opportunitiesRouter);
+
+/**
+ * 8. Unknown /api routes and errors always answer with JSON
+ */
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found." });
+});
+app.use(errorHandler);
 
 // Start the Express HTTP listener (skipped during unit tests so test runner controls lifecycle)
 if (process.env.NODE_ENV !== "test") {

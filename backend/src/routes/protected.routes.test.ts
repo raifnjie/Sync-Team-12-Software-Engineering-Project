@@ -73,10 +73,42 @@ describe("CORS, Environment & Protected Routes Integration Tests", () => {
     it("allows admin user to access admin-only endpoint", async () => {
       const res = await request(app)
         .post("/api/admin/catalog/import")
-        .set("Authorization", `Bearer ${adminToken}`);
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          courses: [
+            { code: "CSC 4998", name: "Special Topics", credits: 3, termsOffered: ["FALL"], prerequisites: [{ anyOf: ["CSC 2720"] }] },
+          ],
+        });
 
       expect(res.status).toBe(200);
       expect(res.body.message).toContain("imported successfully");
+      expect(res.body.imported).toBe(1);
+    });
+
+    // 3. Admin import is validated: an empty body is rejected
+    it("rejects an import with no courses", async () => {
+      const res = await request(app)
+        .post("/api/admin/catalog/import")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+
+    // 4. Circular prerequisites are rejected (FR-12.2)
+    it("rejects an import that would create circular prerequisites", async () => {
+      const res = await request(app)
+        .post("/api/admin/catalog/import")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send({
+          courses: [
+            { code: "CSC 4996", name: "Loop A", credits: 3, termsOffered: ["FALL"], prerequisites: [{ anyOf: ["CSC 4997"] }] },
+            { code: "CSC 4997", name: "Loop B", credits: 3, termsOffered: ["FALL"], prerequisites: [{ anyOf: ["CSC 4996"] }] },
+          ],
+        });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("Circular prerequisites");
     });
   });
 });

@@ -1,8 +1,12 @@
-import { courseByCode, type Course, type DegreeProgram, type TermSeason } from "../data/catalog";
+import type { Course, DegreeProgram } from "../data/catalog";
 import type { Goal, Opportunity } from "../data/opportunities";
 import type { StudentRecord } from "../data/students";
 import { buildDependents, checkPrerequisites, downstreamCourses, longestChainBelow } from "./prerequisite.service";
 import { requirementStatus } from "./progress.service";
+import { SEASON_LABEL, type Term } from "./term.service";
+
+// Term helpers used to live here; re-exported so existing imports keep working
+export { makeTerm, nextTerm, parseTerm, type Term } from "./term.service";
 
 /**
  * Rule-based recommendations (FR-7, FR-10.4; SRS 5.2).
@@ -66,15 +70,7 @@ const TAG_LABEL: Record<string, string> = {
   research: "research",
 };
 
-const SEASON_LABEL: Record<TermSeason, string> = { FALL: "Fall", SPRING: "Spring", SUMMER: "Summer" };
-
 // ─── Types returned to the API ────────────────────────────────────────────────
-
-export interface Term {
-  season: TermSeason;
-  year: number;
-  label: string;
-}
 
 export interface CourseRecommendation {
   code: string;
@@ -120,24 +116,6 @@ export interface CourseRecommendationResult {
   suggestedCredits: number;
 }
 
-// ─── Terms ────────────────────────────────────────────────────────────────────
-
-export function makeTerm(season: TermSeason, year: number): Term {
-  return { season, year, label: `${SEASON_LABEL[season]} ${year}` };
-}
-
-/** The next fall or spring term after `today` (summer is skipped) */
-export function nextTerm(today: Date): Term {
-  const month = today.getMonth(); // 0 = January
-  return month <= 7 ? makeTerm("FALL", today.getFullYear()) : makeTerm("SPRING", today.getFullYear() + 1);
-}
-
-/** Parses "SPRING-2027"; returns null when the text isn't a valid term */
-export function parseTerm(text: string): Term | null {
-  const match = /^(FALL|SPRING|SUMMER)-(\d{4})$/.exec(text.trim().toUpperCase());
-  return match ? makeTerm(match[1] as TermSeason, Number(match[2])) : null;
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function joinWords(items: string[]): string {
@@ -149,8 +127,8 @@ function labelTags(tags: string[]): string {
   return joinWords(tags.map((t) => TAG_LABEL[t] ?? t));
 }
 
-function courseLabel(code: string): string {
-  const course = courseByCode.get(code);
+function courseLabel(code: string, byCode: Map<string, Course>): string {
+  const course = byCode.get(code);
   return course ? `${code} ${course.name}` : code;
 }
 
@@ -177,7 +155,7 @@ export function recommendCourses(
   const goalTags = new Set(GOAL_TAGS[student.goal]);
 
   // Which requirements are still open, and which courses would count toward them
-  const status = requirementStatus(program, done);
+  const status = requirementStatus(program, done, byCode);
   const neededBy = new Map<string, (typeof status)[number]>();
   for (const category of status) {
     for (const code of category.openCourses) {
@@ -243,7 +221,7 @@ export function recommendCourses(
     const leadsTo = [...allUnlocks].find((c) => byCode.get(c)!.tags.some((t) => interests.has(t)));
     if (leadsTo && interestMatches.length === 0) {
       score += w.leadsToInterest;
-      reasons.push(`Leads to ${courseLabel(leadsTo)}, which matches your interests`);
+      reasons.push(`Leads to ${courseLabel(leadsTo, byCode)}, which matches your interests`);
     }
     if (course.tags.some((t) => goalTags.has(t))) {
       score += w.goalMatch;
@@ -287,7 +265,8 @@ export function recommendCourses(
 export function recommendOpportunities(
   student: StudentRecord,
   catalog: Opportunity[],
-  today: Date
+  today: Date,
+  byCode: Map<string, Course>
 ): OpportunityRecommendation[] {
   const w = OPPORTUNITY_WEIGHTS;
   const taken = new Set([...student.completed, ...student.inProgress]);
@@ -316,11 +295,11 @@ export function recommendOpportunities(
       reasons.push(`Matches your interest in ${labelTags(interestMatches)}`);
     }
 
-    const related = opp.relatedCourses.filter((c) => courseByCode.has(c));
+    const related = opp.relatedCourses.filter((c) => byCode.has(c));
     const takenCount = related.filter((c) => taken.has(c)).length;
     const suggestedCourses = related
       .filter((c) => !taken.has(c))
-      .map((c) => ({ code: c, name: courseByCode.get(c)!.name }));
+      .map((c) => ({ code: c, name: byCode.get(c)!.name }));
     if (related.length > 0) {
       score += w.readiness * (takenCount / related.length);
       reasons.push(
@@ -332,7 +311,7 @@ export function recommendOpportunities(
       );
     }
     if (suggestedCourses.length > 0) {
-      reasons.push(`Taking ${courseLabel(suggestedCourses[0].code)} would strengthen your application`);
+      reasons.push(`Taking ${courseLabel(suggestedCourses[0].code, byCode)} would strengthen your application`);
     }
 
     if (daysUntilDeadline !== undefined && daysUntilDeadline <= w.deadlineSoonDays) {

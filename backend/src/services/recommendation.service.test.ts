@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { courses, findProgram, type Course } from "../data/catalog";
+import { courseByCode, courses, findProgram, type Course } from "../data/catalog";
 import { opportunities } from "../data/opportunities";
-import type { StudentRecord } from "../data/students";
+import { demoStudentRecord, type StudentRecord } from "../data/students";
 import { checkPrerequisites, findCycle } from "./prerequisite.service";
 import { requirementStatus } from "./progress.service";
 import {
@@ -16,19 +16,9 @@ const program = findProgram("bs-cs")!;
 const spring = makeTerm("SPRING", 2027);
 const today = new Date(2026, 10, 16); // Nov 16, 2026
 
+// The seeded demo student: senior, gen-ed done, CSC 3350 / MATH 3020 / CSC 4710 in progress
 function student(overrides: Partial<StudentRecord> = {}): StudentRecord {
-  return {
-    id: "stu-1",
-    programId: "bs-cs",
-    completed: ["CSC 1301", "CSC 1302", "CSC 2510", "CSC 2720", "CSC 3210", "CSC 3320", "MATH 1113", "MATH 2211", "MATH 2212", "MATH 2641"],
-    inProgress: ["CSC 3350", "MATH 3020", "CSC 4710"],
-    interests: ["ai", "data"],
-    goal: "grad-school",
-    maxCreditsPerTerm: 15,
-    dismissedCourses: [],
-    dismissedOpportunities: [],
-    ...overrides,
-  };
+  return { ...demoStudentRecord("stu-1"), ...overrides };
 }
 
 const codes = (list: { code: string }[]) => list.map((c) => c.code);
@@ -61,12 +51,12 @@ describe("prerequisite service", () => {
 describe("requirement status", () => {
   it("counts elective credits and lists open courses only while credits remain", () => {
     const done = new Set([...student().completed, ...student().inProgress]);
-    const electives = requirementStatus(program, done).find((c) => c.id === "electives")!;
+    const electives = requirementStatus(program, done, courseByCode).find((c) => c.id === "electives")!;
     expect(electives.creditsRemaining).toBe(6);
     expect(electives.openCourses).toContain("CSC 4850");
 
     done.add("CSC 4222").add("CSC 4220");
-    const finished = requirementStatus(program, done).find((c) => c.id === "electives")!;
+    const finished = requirementStatus(program, done, courseByCode).find((c) => c.id === "electives")!;
     expect(finished.complete).toBe(true);
     expect(finished.openCourses).toEqual([]);
   });
@@ -135,26 +125,26 @@ describe("recommendCourses", () => {
 
 describe("recommendOpportunities", () => {
   it("puts options that fit the student's goal and interests first", () => {
-    const [top] = recommendOpportunities(student(), opportunities, today);
+    const [top] = recommendOpportunities(student(), opportunities, today, courseByCode);
     expect(top.id).toBe("ex-research");
     expect(top.reasons).toContain("Fits your goal: graduate school");
     expect(top.suggestedCourses.map((c) => c.code)).toEqual(["CSC 4850"]);
   });
 
   it("changes with the goal", () => {
-    const ids = recommendOpportunities(student({ goal: "industry", interests: ["software"] }), opportunities, today).map((o) => o.id);
+    const ids = recommendOpportunities(student({ goal: "industry", interests: ["software"] }), opportunities, today, courseByCode).map((o) => o.id);
     expect(ids.indexOf("pg-new-grad-swe")).toBeLessThan(ids.indexOf("pg-ms-cs") === -1 ? Infinity : ids.indexOf("pg-ms-cs"));
     expect(ids).toContain("ex-swe-intern");
   });
 
   it("drops dismissed options and ones whose deadline has passed", () => {
-    const ids = recommendOpportunities(student({ dismissedOpportunities: ["pg-ms-ds"] }), opportunities, new Date(2027, 1, 10)).map((o) => o.id);
+    const ids = recommendOpportunities(student({ dismissedOpportunities: ["pg-ms-ds"] }), opportunities, new Date(2027, 1, 10), courseByCode).map((o) => o.id);
     expect(ids).not.toContain("pg-ms-ds");
     expect(ids).not.toContain("ex-research"); // deadline Jan 15, 2027
   });
 
   it("reports readiness and an upcoming deadline", () => {
-    const research = recommendOpportunities(student(), opportunities, today).find((o) => o.id === "ex-research")!;
+    const research = recommendOpportunities(student(), opportunities, today, courseByCode).find((o) => o.id === "ex-research")!;
     expect(research.readiness).toEqual({ taken: 2, total: 3 });
     expect(research.daysUntilDeadline).toBe(60);
   });
