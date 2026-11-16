@@ -18,9 +18,10 @@ The student's **goal** (graduate school, job in industry, undecided) and **inter
 | `backend/src/services/prerequisite.service.ts` | Prerequisite checks (AND/OR groups, corequisites), unlock counts, longest chain, cycle detection |
 | `backend/src/services/progress.service.ts` | Which requirement categories are still open |
 | `backend/src/routes/recommendations.routes.ts` | REST API |
-| `backend/src/data/*.ts` | **Sample** catalog, opportunities, and an in-memory student store (to be replaced by Prisma) |
+| `backend/src/repositories/*.ts` | Load the catalog and each student's data from PostgreSQL (see `docs/database.md`) |
+| `backend/src/data/*.ts` | Domain types and the **sample** data loaded by `npm run db:seed` |
 | `frontend/src/pages/recommendationspage.tsx` | The page |
-| `frontend/src/lib/api.ts`, `frontend/src/lib/recommendations.ts` | API helper and typed client |
+| `frontend/src/lib/api.ts`, `frontend/src/lib/recommendations.ts`, `frontend/src/lib/usePlan.ts` | API helper, typed client, and shared plan state |
 
 ## How courses are ranked
 
@@ -59,7 +60,6 @@ Errors: 400 bad input, 401 no token, 403 someone else's data or an invalid token
 
 ## Known limitations
 
-- Catalog, opportunities, and student records are sample data held in memory. Preferences and dismissals reset when the server restarts.
-- "Add to plan" and "Save" are stored in the browser (`sync_plan`, `sync_saved_opportunities`) until the plan and opportunities APIs exist.
+- The catalog and opportunities are sample data (`npm run db:seed`) until real GSU catalog data is imported.
 - Personal schedule and extracurricular time conflicts (FR-7.2, FR-9) aren't considered yet.
 - A course is counted toward the first requirement category that lists it.
