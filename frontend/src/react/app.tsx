@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import SignInPage from "../pages/signinpage";
 import DashboardPage from "../pages/dashboardpage";
 import TimelinePage from "../pages/timelinepage";
+import RecommendationsPage from "../pages/recommendationspage";
 
 // The default result on every page not currently built out.
 function ComingSoon() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/login" element={<SignInPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/timeline" element={<TimelinePage />} />
+        <Route path="/recs" element={<RecommendationsPage />} />
         <Route path="*" element={<ComingSoon />} />
       </Routes>
     </BrowserRouter>
