@@ -3,6 +3,7 @@ import cors from "cors";
 import { config } from "./config";
 import { healthRouter } from "./routes/health.routes";
 import { protectedRouter } from "./routes/protected.routes";
+import { recommendationsRouter } from "./routes/recommendations.routes";
 import { generateToken } from "./middleware/auth.middleware";
 
 // Initialize the Express backend application
@@ -49,6 +50,12 @@ app.post("/api/auth/demo-token", (req, res) => {
  * Registers all protected endpoints behind the "/api" prefix.
  */
 app.use("/api", protectedRouter);
+
+/**
+ * 6. Recommendations (courses, post-grad options, experiences):
+ * GET/PATCH/POST/DELETE /api/recommendations/:studentId/...
+ */
+app.use("/api", recommendationsRouter);
 
 // Start the Express HTTP listener (skipped during unit tests so test runner controls lifecycle)
 if (process.env.NODE_ENV !== "test") {
