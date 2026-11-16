@@ -49,6 +49,8 @@ export type Recommendations = {
   blocked: BlockedCourse[];
   postGrad: OpportunityRecommendation[];
   experiences: OpportunityRecommendation[];
+  /** Ids of opportunities the student saved */
+  saved: string[];
   dismissed: { courses: { id: string; title: string }[]; opportunities: { id: string; title: string }[] };
 };
 
@@ -68,4 +70,18 @@ export function dismiss(kind: DismissKind, id: string): Promise<Recommendations>
 
 export function restore(kind: DismissKind, id: string): Promise<Recommendations> {
   return apiFetch<Recommendations>(`${BASE}/dismissals/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/* Saved post-grad options and experiences (FR-10.2) */
+
+type SavedList = { saved: { id: string }[] };
+
+export async function saveOpportunity(id: string): Promise<string[]> {
+  const res = await apiFetch<SavedList>(`/api/opportunities/me/saved/${encodeURIComponent(id)}`, { method: "PUT", body: "{}" });
+  return res.saved.map((s) => s.id);
+}
+
+export async function unsaveOpportunity(id: string): Promise<string[]> {
+  const res = await apiFetch<SavedList>(`/api/opportunities/me/saved/${encodeURIComponent(id)}`, { method: "DELETE" });
+  return res.saved.map((s) => s.id);
 }

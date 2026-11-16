@@ -1,66 +1,82 @@
 /**
- * Shared helper for calling the Sync backend. Every page should go through
- * apiFetch so the base URL, auth header, and error handling live in one place.
+ * Shared helper for calling the Sync backend. Every page goes through apiFetch
+ * so the base URL, login token, and error handling live in one place.
+ *
+ * The session is kept in localStorage:
+ *   sync_token  the JWT from /api/auth/login or /register (sent on every request)
+ *   sync_user   { id, name, email, role } so pages can greet the user without a request
  */
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:5000";
-const TOKEN_KEY = "sync_token";
-const USER_KEY = "sync_user";
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:5001";
+export const TOKEN_KEY = "sync_token";
+export const USER_KEY = "sync_user";
+
+export type SessionUser = { id: string; name: string; email: string; role: "student" | "advisor" | "admin" };
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+    public body: Record<string, unknown> = {}
+  ) {
     super(message);
   }
 }
 
-function readEmail(): string | null {
+export function saveSession(token: string, user: SessionUser): void {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function clearSession(): void {
   try {
-    const user = JSON.parse(localStorage.getItem(USER_KEY) ?? "null");
-    return user && typeof user.email === "string" ? user.email : null;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   } catch {
-    return null;
+    // Storage blocked: nothing to clear
   }
 }
 
-/**
- * Returns the stored JWT, or gets one.
- * TODO: once POST /api/auth/login exists, the sign-in page should save the
- * token it returns under TOKEN_KEY and this demo-token fallback should go.
- */
-async function getToken(): Promise<string> {
-  const stored = localStorage.getItem(TOKEN_KEY);
-  if (stored) return stored;
-
-  const email = readEmail() ?? "student@gsu.edu";
-  const res = await fetch(`${API_URL}/api/auth/demo-token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, id: email, role: "student" }),
-  });
-  if (!res.ok) throw new ApiError(res.status, "Couldn't sign in to the Sync server.");
-  const { token } = (await res.json()) as { token: string };
-  localStorage.setItem(TOKEN_KEY, token);
-  return token;
+/** The session ended (expired token, deleted account): forget it and go to the log in page */
+function endSession(): never {
+  clearSession();
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.assign("/login");
+  }
+  throw new ApiError(401, "Your session has ended. Please log in again.");
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+type Options = {
+  /** false for requests made before logging in (login, register) */
+  auth?: boolean;
+};
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}, { auth = true }: Options = {}): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (auth) {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) endSession();
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   let res: Response;
   try {
-    const token = await getToken();
-    res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...init.headers },
-    });
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
+    res = await fetch(`${API_URL}${path}`, { ...init, headers: { ...headers, ...init.headers } });
+  } catch {
     throw new ApiError(0, "Can't reach the Sync server. Make sure the backend is running, then try again.");
   }
 
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    // An expired or bad token: forget it so the next request gets a fresh one
-    if (res.status === 401 || res.status === 403) localStorage.removeItem(TOKEN_KEY);
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new ApiError(res.status, body.error ?? `Request failed (${res.status}).`);
+    const message = typeof body.error === "string" ? body.error : `Request failed (${res.status}).`;
+    // 401, or 403 for a bad token, means the login is no longer valid
+    if (auth && (res.status === 401 || (res.status === 403 && /token/i.test(message)))) endSession();
+    throw new ApiError(res.status, message, body);
   }
-  return (await res.json()) as T;
+  return body as T;
+}
+
+/** A readable message for any error thrown by apiFetch */
+export function errorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
+  return error instanceof ApiError ? error.message : fallback;
 }

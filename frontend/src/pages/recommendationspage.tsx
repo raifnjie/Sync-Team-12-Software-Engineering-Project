@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/navbar";
-import { ApiError } from "../lib/api";
+import { ApiError, errorMessage } from "../lib/api";
+import { usePlan } from "../lib/usePlan";
 import {
   dismiss,
   getRecommendations,
   restore,
+  saveOpportunity,
+  unsaveOpportunity,
   updatePreferences,
   type CourseRecommendation,
   type DismissKind,
@@ -14,11 +17,8 @@ import {
   type Recommendations,
 } from "../lib/recommendations";
 
-/* Same keys the dashboard uses, so "Add to plan" shows up there too */
+/* Same key the log in page uses */
 const USER_KEY = "sync_user";
-const PLAN_KEY = "sync_plan";
-/* TODO: move saved opportunities to the backend with application tracking (FR-10.2, FR-10.3) */
-const SAVED_KEY = "sync_saved_opportunities";
 
 type Tab = "courses" | "postGrad" | "experiences";
 
@@ -46,24 +46,6 @@ const KIND_LABEL: Record<OpportunityRecommendation["kind"], string> = {
   certification: "Certification",
   club: "Club & events",
 };
-
-/* Safely read a list of strings from localStorage */
-function readList(key: string): string[] {
-  try {
-    const saved = JSON.parse(localStorage.getItem(key) ?? "[]");
-    return Array.isArray(saved) ? saved.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeList(key: string, list: string[]) {
-  try {
-    localStorage.setItem(key, JSON.stringify(list));
-  } catch {
-    // If the browser blocks storage, the list just won't be remembered
-  }
-}
 
 function isLoggedIn() {
   try {
@@ -288,8 +270,9 @@ export default function RecommendationsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("courses");
-  const [plan, setPlan] = useState<string[]>(() => readList(PLAN_KEY));
-  const [saved, setSaved] = useState<string[]>(() => readList(SAVED_KEY));
+  // The plan is shared with the dashboard; both read and write it on the server
+  const { codes: plan, toggle: togglePlan, error: planError } = usePlan(loggedIn);
+  const [saved, setSaved] = useState<string[]>([]);
 
   useEffect(() => {
     document.title = "Recommendations · Sync";
@@ -298,7 +281,9 @@ export default function RecommendationsPage() {
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      setData(await getRecommendations());
+      const recs = await getRecommendations();
+      setData(recs);
+      setSaved(recs.saved);
     } catch (error) {
       setLoadError(error instanceof ApiError ? error.message : "Something went wrong loading recommendations.");
     }
@@ -307,9 +292,6 @@ export default function RecommendationsPage() {
   useEffect(() => {
     if (loggedIn) void load();
   }, [loggedIn, load]);
-
-  useEffect(() => writeList(PLAN_KEY, plan), [plan]);
-  useEffect(() => writeList(SAVED_KEY, saved), [saved]);
 
   if (!loggedIn) return <Navigate to="/login" replace />;
 
@@ -327,6 +309,18 @@ export default function RecommendationsPage() {
   }
 
   const toggleIn = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+  async function toggleSaved(id: string) {
+    const wasSaved = saved.includes(id);
+    setActionError(null);
+    setSaved((s) => toggleIn(s, id));
+    try {
+      setSaved(wasSaved ? await unsaveOpportunity(id) : await saveOpportunity(id));
+    } catch (error) {
+      setSaved((s) => (wasSaved ? [...s, id] : s.filter((x) => x !== id)));
+      setActionError(errorMessage(error, "Couldn't update your saved list. Please try again."));
+    }
+  }
 
   function toggleInterest(interest: string) {
     if (!data) return;
@@ -408,9 +402,9 @@ export default function RecommendationsPage() {
               </Card>
             </section>
 
-            {actionError && (
+            {(actionError || planError) && (
               <p role="alert" className="mb-3 text-xs text-red-600">
-                {actionError}
+                {actionError ?? planError}
               </p>
             )}
 
@@ -473,7 +467,7 @@ export default function RecommendationsPage() {
                         rank={i + 1}
                         added={plan.includes(course.code)}
                         busy={busy}
-                        onToggle={() => setPlan((p) => toggleIn(p, course.code))}
+                        onToggle={() => void togglePlan(course.code)}
                         onDismiss={() => void run(() => dismiss("course", course.code))}
                       />
                     ))}
@@ -519,7 +513,7 @@ export default function RecommendationsPage() {
                         opp={opp}
                         saved={saved.includes(opp.id)}
                         busy={busy}
-                        onToggleSave={() => setSaved((s) => toggleIn(s, opp.id))}
+                        onToggleSave={() => void toggleSaved(opp.id)}
                         onDismiss={() => void run(() => dismiss("opportunity", opp.id))}
                       />
                     ))}

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import RecommendationsPage from "./recommendationspage";
 import * as api from "../lib/recommendations";
+import * as planApi from "../lib/plan";
 import { ApiError } from "../lib/api";
 import type { Recommendations } from "../lib/recommendations";
 
@@ -12,7 +13,18 @@ vi.mock("../lib/recommendations", () => ({
   updatePreferences: vi.fn(),
   dismiss: vi.fn(),
   restore: vi.fn(),
+  saveOpportunity: vi.fn(),
+  unsaveOpportunity: vi.fn(),
 }));
+// The real usePlan hook runs; only its server calls are replaced
+vi.mock("../lib/plan", () => ({ getPlan: vi.fn(), addToPlan: vi.fn(), removeFromPlan: vi.fn() }));
+
+const term = { season: "SPRING", year: 2027, label: "Spring 2027" };
+const planWith = (...codes: string[]) => ({
+  defaultTerm: term,
+  totalCredits: codes.length * 3,
+  courses: codes.map((code) => ({ code, name: code, credits: 3, term, missing: [] })),
+});
 
 function sample(overrides: Partial<Recommendations> = {}): Recommendations {
   return {
@@ -63,6 +75,7 @@ function sample(overrides: Partial<Recommendations> = {}): Recommendations {
       },
     ],
     experiences: [],
+    saved: [],
     dismissed: { courses: [], opportunities: [] },
     ...overrides,
   };
@@ -83,6 +96,7 @@ describe("RecommendationsPage", () => {
   beforeEach(() => {
     localStorage.setItem("sync_user", JSON.stringify({ name: "Mike Smith", email: "mike@gsu.edu" }));
     vi.mocked(api.getRecommendations).mockResolvedValue(sample());
+    vi.mocked(planApi.getPlan).mockResolvedValue(planWith());
   });
 
   afterEach(() => {
@@ -108,12 +122,27 @@ describe("RecommendationsPage", () => {
     expect(screen.getByText("Needs CSC 4520 and either MATH 3020 or MATH 4751")).toBeTruthy();
   });
 
-  it("adds a recommended course to the same plan the dashboard uses", async () => {
+  it("adds a recommended course to the saved plan", async () => {
+    vi.mocked(planApi.addToPlan).mockResolvedValue(planWith("CSC 4520"));
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Add CSC 4520 to plan" }));
 
-    expect(screen.getByText("1 course in your plan")).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem("sync_plan") ?? "[]")).toEqual(["CSC 4520"]);
+    expect(await screen.findByText("1 course in your plan")).toBeTruthy();
+    expect(planApi.addToPlan).toHaveBeenCalledWith("CSC 4520");
+    expect(screen.getByRole("button", { name: "Remove CSC 4520 from plan" })).toBeTruthy();
+  });
+
+  it("shows courses already in the plan and explains when the server refuses an add", async () => {
+    vi.mocked(planApi.getPlan).mockResolvedValue(planWith("CSC 4350"));
+    vi.mocked(planApi.addToPlan).mockRejectedValue(new ApiError(409, "CSC 4520 needs CSC 2720 first."));
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Remove CSC 4350 from plan" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add CSC 4520 to plan" }));
+
+    expect(await screen.findByText("CSC 4520 needs CSC 2720 first.")).toBeTruthy();
+    // The optimistic add is undone
+    expect(screen.getByRole("button", { name: "Add CSC 4520 to plan" })).toBeTruthy();
   });
 
   it("dismisses a course and lets the student restore it", async () => {
@@ -141,8 +170,10 @@ describe("RecommendationsPage", () => {
     expect(screen.getByText("M.S. in Computer Science")).toBeTruthy();
     expect(screen.getByText("Related courses taken: 1 of 3")).toBeTruthy();
 
+    vi.mocked(api.saveOpportunity).mockResolvedValue(["pg-ms-cs"]);
     fireEvent.click(screen.getByRole("button", { name: "Save M.S. in Computer Science" }));
-    expect(JSON.parse(localStorage.getItem("sync_saved_opportunities") ?? "[]")).toEqual(["pg-ms-cs"]);
+    expect(await screen.findByRole("button", { name: "Unsave M.S. in Computer Science" })).toBeTruthy();
+    expect(api.saveOpportunity).toHaveBeenCalledWith("pg-ms-cs");
   });
 
   it("re-ranks when the student changes their goal or interests", async () => {
