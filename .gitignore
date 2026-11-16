@@ -26,3 +26,6 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+
+# Prisma client (rebuilt by `npm install` or `npx prisma generate`)
+backend/src/generated/

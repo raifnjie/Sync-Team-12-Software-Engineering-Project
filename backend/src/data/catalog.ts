@@ -1,10 +1,10 @@
 /**
- * Course catalog and degree requirements.
+ * Domain types for the course catalog, plus SAMPLE catalog data.
  *
- * SAMPLE DATA: modeled on a B.S. in Computer Science so the recommendation
- * engine has something realistic to work with. Once the Prisma schema and
- * catalog import exist (FR-12.1), this file is replaced by database queries;
- * the shapes below are what the services expect either way.
+ * The app reads the catalog from the database (src/repositories/catalog.repo.ts).
+ * The sample data below is what `npm run db:seed` loads into the database and
+ * what the service unit tests run against. Admins can add or update courses
+ * later through POST /api/admin/catalog/import.
  */
 
 export type TermSeason = "FALL" | "SPRING" | "SUMMER";
@@ -45,6 +45,8 @@ export interface RequirementCategory {
 export interface DegreeProgram {
   id: string;
   name: string;
+  /** Credits needed to graduate; anything beyond the categories counts as free electives */
+  totalCredits: number;
   categories: RequirementCategory[];
 }
 
@@ -83,13 +85,47 @@ export const courses: Course[] = [
   { code: "CSC 4760", name: "Big Data Programming", credits: 3, termsOffered: ["SPRING"], tags: ["data", "systems"], prerequisites: [{ anyOf: ["CSC 4710"] }] },
   { code: "CSC 4810", name: "Artificial Intelligence", credits: 3, termsOffered: FALL_SPRING, tags: ["ai", "research"], prerequisites: [{ anyOf: ["CSC 4520"] }] },
   { code: "CSC 4850", name: "Machine Learning", credits: 3, termsOffered: ["FALL"], tags: ["ai", "data", "research"], prerequisites: [{ anyOf: ["CSC 4520"] }, { anyOf: ["MATH 3020", "MATH 4751"] }] },
+
+  // ── General education (core curriculum) ──
+  { code: "ENGL 1101", name: "English Composition I", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "ENGL 1102", name: "English Composition II", credits: 3, termsOffered: ALL, tags: [], prerequisites: [{ anyOf: ["ENGL 1101"] }] },
+  { code: "ENGL 2110", name: "World Literature", credits: 3, termsOffered: ALL, tags: [], prerequisites: [{ anyOf: ["ENGL 1102"] }] },
+  { code: "HIST 2110", name: "Survey of U.S. History", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "POLS 1101", name: "American Government", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "PSYC 1101", name: "Introduction to General Psychology", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "SOCI 1101", name: "Introductory Sociology", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "ECON 2105", name: "Principles of Macroeconomics", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "PHIL 2010", name: "Introduction to Philosophy", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "COMM 1000", name: "Human Communication", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "MUS 1010", name: "Music Appreciation", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "PERS 2001", name: "Perspectives on Comparative Culture", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "BIOL 2107K", name: "Principles of Biology I", credits: 4, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "BIOL 2108K", name: "Principles of Biology II", credits: 4, termsOffered: ALL, tags: [], prerequisites: [{ anyOf: ["BIOL 2107K"] }] },
+  { code: "CHEM 1211K", name: "Principles of Chemistry I", credits: 4, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "PHYS 2211K", name: "Principles of Physics I", credits: 4, termsOffered: ALL, tags: [], prerequisites: [{ anyOf: ["MATH 2211"] }] },
+
+  // ── Free electives (count toward total credits only) ──
+  { code: "SPAN 1001", name: "Elementary Spanish I", credits: 3, termsOffered: ALL, tags: [], prerequisites: [] },
+  { code: "SPAN 1002", name: "Elementary Spanish II", credits: 3, termsOffered: ALL, tags: [], prerequisites: [{ anyOf: ["SPAN 1001"] }] },
+  { code: "SPAN 2001", name: "Intermediate Spanish I", credits: 3, termsOffered: ALL, tags: [], prerequisites: [{ anyOf: ["SPAN 1002"] }] },
 ];
 
 export const programs: DegreeProgram[] = [
   {
     id: "bs-cs",
     name: "B.S. Computer Science",
+    totalCredits: 120,
     categories: [
+      {
+        id: "gen-ed",
+        name: "General Education",
+        kind: "credits",
+        creditsRequired: 42,
+        courses: [
+          "ENGL 1101", "ENGL 1102", "ENGL 2110", "HIST 2110", "POLS 1101", "PSYC 1101", "SOCI 1101", "ECON 2105",
+          "PHIL 2010", "COMM 1000", "MUS 1010", "PERS 2001", "BIOL 2107K", "BIOL 2108K", "CHEM 1211K", "PHYS 2211K",
+        ],
+      },
       {
         id: "foundations",
         name: "CS & Math Foundations",

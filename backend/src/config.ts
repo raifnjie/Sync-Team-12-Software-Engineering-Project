@@ -5,9 +5,11 @@ dotenv.config();
 
 // Export centralized, typed config object with sensible fallbacks
 export const config = {
-  port: parseInt(process.env.PORT || "5000", 10),
+  port: parseInt(process.env.PORT || "5001", 10),
   jwtSecret: process.env.JWT_SECRET || "sync_dev_secret_change_in_production",
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173",
   nodeEnv: process.env.NODE_ENV || "development",
+  // PostgreSQL connection string, e.g. postgresql://user:password@localhost:5432/sync_dev
+  databaseUrl: process.env.DATABASE_URL || "",
 };
 
