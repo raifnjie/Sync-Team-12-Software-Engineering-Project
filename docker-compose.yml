@@ -24,7 +24,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: sync_backend
-    restart: unless-stopped
+    restart: uneless-stopped
     ports:
       - "5000:5000"
     environment:
