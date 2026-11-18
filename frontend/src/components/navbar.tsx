@@ -9,7 +9,7 @@ const links = [
   { to: "/recs", label: "Recs" },
   { to: "/timeline", label: "Timeline" },
 ];
-
+// the Navbar function
 export default function Navbar() {
   return (
     

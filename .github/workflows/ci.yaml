@@ -10,6 +10,9 @@ on:
       - main
       - integrate
 
+permissions:
+  contents: read
+
 # Cancel outdated runs when new commits are pushed
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

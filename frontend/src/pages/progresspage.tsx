@@ -1,166 +1,158 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/navbar";
+import ProgressBar from "../components/progressbar";
+import ProgressRing from "../components/progressring";
+import { categories, credits, type CourseStatus } from "../lib/mockdata";
+import { inProgressCredits, remainingCourses, toPercent } from "../lib/progress";
+import { loadUser } from "../lib/session";
 
-const USER_KEY = "sync_user";
 
-type SessionUser = { name: string; email: string };
-
-type Requirement = {
-  category: string;
-  earned: number;
-  required: number;
-  courses: { code: string; name: string; credits: number; done: boolean }[];
+// The sample status labels
+const statusLabel: Record<CourseStatus, string> = {
+  completed: "Done",
+  "in-progress": "In Progress",
+  "not-taken": "Not taken",
 };
 
-/* Mock degree‑audit data */
-const requirements: Requirement[] = [
-  {
-    category: "Core Computer Science",
-    earned: 33,
-    required: 42,
-    courses: [
-      { code: "CSC 1301", name: "Intro to Computer Science", credits: 3, done: true },
-      { code: "CSC 1302", name: "Computer Science II", credits: 3, done: true },
-      { code: "CSC 2310", name: "Data Structures", credits: 3, done: true },
-      { code: "CSC 3210", name: "Computer Organization", credits: 3, done: true },
-      { code: "CSC 3310", name: "Design & Analysis of Algorithms", credits: 3, done: true },
-      { code: "CSC 3410", name: "Systems Programming", credits: 3, done: true },
-      { code: "CSC 4350", name: "Software Engineering", credits: 3, done: true },
-      { code: "CSC 4330", name: "Programming Languages", credits: 3, done: true },
-      { code: "CSC 4730", name: "Operating Systems", credits: 3, done: true },
-      { code: "CSC 4810", name: "Computer Networks", credits: 3, done: true },
-      { code: "CSC 4510", name: "Theory of Computation", credits: 3, done: true },
-      { code: "CSC 4720", name: "Database Systems", credits: 3, done: false },
-      { code: "CSC 4910", name: "Technical Elective II", credits: 3, done: false },
-      { code: "CSC 4930", name: "Technical Elective III", credits: 3, done: false },
-    ],
-  },
-  {
-    category: "Mathematics",
-    earned: 10,
-    required: 16,
-    courses: [
-      { code: "MATH 1113", name: "Pre-Calculus", credits: 3, done: true },
-      { code: "MATH 2211", name: "Calculus I", credits: 4, done: true },
-      { code: "MATH 2212", name: "Calculus II", credits: 4, done: false },
-      { code: "MATH 3670", name: "Probability & Statistics", credits: 3, done: true },
-      { code: "MATH 2420", name: "Discrete Math", credits: 3, done: false },
-    ],
-  },
-  {
-    category: "General Education",
-    earned: 15,
-    required: 18,
-    courses: [
-      { code: "ENGL 1101", name: "English Composition I", credits: 3, done: true },
-      { code: "ENGL 1102", name: "English Composition II", credits: 3, done: true },
-      { code: "ENGL 2130", name: "American Literature", credits: 3, done: true },
-      { code: "HIST 2110", name: "Survey of U.S. History", credits: 3, done: true },
-      { code: "POLS 1101", name: "American Government", credits: 3, done: true },
-      { code: "CSC 1010", name: "Computers and Society", credits: 3, done: false },
-    ],
-  },
-];
+// The different status styles
+const statusStyle: Record<CourseStatus, string> = {
+  completed: "bg-green-100 text-green-700",
+  "in-progress": "bg-brand/10 text-brand",
+  "not-taken": "bg-gray-100 text-gray-600",
+};
 
-function loadUser(): SessionUser | null {
-  try {
-    const raw = localStorage.getItem(USER_KEY);
-    if (!raw) return null;
-    const user = JSON.parse(raw) as SessionUser;
-    return user && typeof user.name === "string" ? user : null;
-  } catch {
-    return null;
-  }
+function StatCard({ label, value, sub }: { label: string; value: ReactNode; sub?: string }) {
+  return (
+    <div className="rounded-md border border-gray-200 bg-white px-4 py-3.5">
+      <p className="mb-1.5 text-[11px] text-gray-500">{label}</p>
+      <p className="text-xl font-bold">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-gray-500">{sub}</p>}
+    </div>
+  );
 }
 
 export default function ProgressPage() {
-  const [user] = useState<SessionUser | null>(loadUser);
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [user] = useState(loadUser);
 
   useEffect(() => {
     document.title = "Progress · Sync";
   }, []);
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
-  const totalEarned = requirements.reduce((s, r) => s + r.earned, 0);
-  const totalRequired = requirements.reduce((s, r) => s + r.required, 0);
-  const overallPercent = Math.round((totalEarned / totalRequired) * 100);
+  const remaining = credits.required - credits.earned;
+  const overall = toPercent(credits.earned, credits.required);
+  const takingNow = categories.reduce((sum, c) => sum + inProgressCredits(c), 0);
 
   return (
     <>
       <Navbar />
 
-      <main className="mx-auto max-w-250 p-6">
-        <h1 className="mb-1 text-lg font-bold">Degree Progress</h1>
-        <p className="mb-5 text-xs text-gray-500">
-          {totalEarned} of {totalRequired} credit hours completed ({overallPercent}%)
-        </p>
-
-        {/* Overall progress bar */}
-        <div
-          role="progressbar"
-          aria-label="Overall degree progress"
-          aria-valuenow={overallPercent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          className="mb-6 h-2.5 overflow-hidden rounded-full bg-gray-200"
-        >
-          <div className="h-full bg-brand transition-all" style={{ width: `${overallPercent}%` }} />
+      <main className="mx-auto max-w-250 p-4 sm:p-6">
+        <div className="mb-4">
+          <h1 className="text-lg font-bold">Degree Progress</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            What you have finished, what you are taking, and what is left in each requirement.
+          </p>
         </div>
 
-        {/* Category breakdown */}
-        <div className="space-y-3">
-          {requirements.map((req, idx) => {
-            const pct = Math.round((req.earned / req.required) * 100);
-            const isOpen = openIdx === idx;
-            return (
-              <div key={req.category} className="rounded-lg border border-gray-200 bg-white">
-                <button
-                  type="button"
-                  onClick={() => setOpenIdx(isOpen ? null : idx)}
-                  className="flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left"
-                >
-                  <div>
-                    <span className="text-sm font-semibold">{req.category}</span>
-                    <span className="ml-2 text-xs text-gray-500">
-                      {req.earned}/{req.required} credits · {pct}%
-                    </span>
+        {/* The overall picture: a ring plus the key numbers */}
+        <section aria-label="Overall progress" className="mb-6 grid gap-3 md:grid-cols-[auto_1fr]">
+          <div className="flex flex-col items-center gap-2 rounded-md border border-gray-200 bg-white px-8 py-5">
+            <ProgressRing value={overall} label="Overall degree progress" />
+            <p className="text-xs text-gray-500">of your degree complete</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Credits earned" value={credits.earned} sub={`of ${credits.required} required`} />
+            <StatCard label="Credits to go" value={remaining} sub="still needed to graduate" />
+            <StatCard label="Taking now" value={takingNow} sub="credits in progress" />
+            <StatCard label="Expected graduation" value="Spring 2027" sub="On track" />
+          </div>
+        </section>
+
+        {/* One card per requirement category */}
+        <section aria-label="Requirements">
+          <h2 className="mb-2 text-sm font-bold">Requirements</h2>
+          <ul className="grid gap-3 md:grid-cols-2">
+            {categories.map((category) => {
+              const left = category.required - category.earned;
+              const complete = left <= 0;
+              const taking = inProgressCredits(category);
+              const courses = remainingCourses(category);
+
+              return (
+                <li key={category.id} className="rounded-md border border-gray-200 bg-white px-4 py-3.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <h3 className="text-sm font-bold">{category.name}</h3>
+                    <p className="text-xs text-gray-500">
+                      {category.earned} / {category.required} credits
+                    </p>
                   </div>
-                  <span className="text-xs text-gray-400">{isOpen ? "▲" : "▼"}</span>
-                </button>
 
-                {/* Mini progress bar */}
-                <div className="mx-4 mb-3 h-1.5 overflow-hidden rounded-sm bg-gray-200">
-                  <div className="h-full bg-brand transition-all" style={{ width: `${pct}%` }} />
-                </div>
+                  <ProgressBar
+                    className="mt-2.5"
+                    label={`${category.name} progress`}
+                    value={toPercent(category.earned, category.required)}
+                    inProgressValue={toPercent(taking, category.required)}
+                    valueText={`${category.earned} of ${category.required} credits`}
+                    tone={complete ? "green" : "brand"}
+                  />
 
-                {isOpen && (
-                  <ul className="divide-y divide-gray-100 border-t border-gray-100">
-                    {req.courses.map((c) => (
-                      <li key={c.code} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-xs">
-                          <span className="font-medium text-gray-900">{c.code}</span>
-                          <span className="ml-1.5 text-gray-500">{c.name}</span>
-                        </span>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            c.done
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
-                        >
-                          {c.done ? "Done" : "Remaining"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <p className={`mt-2 text-xs ${complete ? "font-medium text-green-700" : "text-gray-500"}`}>
+                    {complete ? "Complete ✓" : `${left} ${left === 1 ? "credit" : "credits"} to go`}
+                  </p>
+
+                  {!complete && (
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer py-1 text-brand hover:underline">
+                        What is left
+                      </summary>
+                      <ul className="mt-1 divide-y divide-gray-100">
+                        {courses.map((course) => (
+                          <li key={course.code} className="flex items-center justify-between gap-2 py-2">
+                            <span className="min-w-0">
+                              <span className="font-medium text-gray-900">{course.code}</span>
+                              <span className="ml-1.5 text-gray-500">{course.name}</span>
+                            </span>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle[course.status]}`}
+                            >
+                              {statusLabel[course.status]}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {category.note && <p className="mt-1 text-gray-500">{category.note}</p>}
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Key for the lighter part of each bar */}
+          <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2 w-2 rounded-sm bg-brand" /> Earned
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2 w-2 rounded-sm bg-brand/40" /> In progress
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2 w-2 rounded-sm bg-gray-200" /> Still needed
+            </span>
+          </p>
+        </section>
+
+        <p className="mt-6 text-xs">
+          <Link to="/map" className="text-brand hover:underline">
+            See which courses you can take next
+          </Link>
+        </p>
       </main>
     </>
   );

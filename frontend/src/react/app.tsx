@@ -18,7 +18,7 @@ function ComingSoon() {
     </div>
   );
 }
-
+// The App function
 export default function App() {
   return (
     <BrowserRouter>

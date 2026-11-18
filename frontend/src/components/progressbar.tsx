@@ -1,3 +1,4 @@
+// The ProgressBarProps
 type ProgressBarProps = {
   /* Finished part, as a percent from 0 to 100 */
   value: number;

@@ -1,194 +1,231 @@
+// The different items to import
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/navbar";
+import { catalog, type CatalogCourse, type CourseStatus } from "../lib/mockdata";
+import { availability, missingPrereqs, prereqChain, prereqsOf, unlocks, type Availability } from "../lib/prerequisites";
+import { loadUser } from "../lib/session";
 
-const USER_KEY = "sync_user";
 
-type SessionUser = { name: string; email: string };
 
-type MapCourse = {
-  code: string;
-  name: string;
-  credits: number;
-  prereqs: string[];
-  status: "completed" | "in-progress" | "available" | "locked";
-};
-
-/* Mock prerequisite‑map data */
-const courses: MapCourse[] = [
-  { code: "CSC 1301", name: "Intro to CS", credits: 3, prereqs: [], status: "completed" },
-  { code: "CSC 1302", name: "CS II", credits: 3, prereqs: ["CSC 1301"], status: "completed" },
-  { code: "CSC 2310", name: "Data Structures", credits: 3, prereqs: ["CSC 1302"], status: "completed" },
-  { code: "MATH 2211", name: "Calculus I", credits: 4, prereqs: ["MATH 1113"], status: "completed" },
-  { code: "MATH 1113", name: "Pre-Calculus", credits: 3, prereqs: [], status: "completed" },
-  { code: "MATH 2212", name: "Calculus II", credits: 4, prereqs: ["MATH 2211"], status: "completed" },
-  { code: "CSC 3210", name: "Computer Organization", credits: 3, prereqs: ["CSC 1302"], status: "completed" },
-  { code: "CSC 3310", name: "Algorithms", credits: 3, prereqs: ["CSC 2310", "MATH 2212"], status: "completed" },
-  { code: "CSC 3410", name: "Systems Programming", credits: 3, prereqs: ["CSC 3210"], status: "completed" },
-  { code: "CSC 4350", name: "Software Engineering", credits: 3, prereqs: ["CSC 3310"], status: "completed" },
-  { code: "CSC 4720", name: "Database Systems", credits: 3, prereqs: ["CSC 2310"], status: "completed" },
-  { code: "CSC 4730", name: "Operating Systems", credits: 3, prereqs: ["CSC 3410"], status: "completed" },
-  { code: "CSC 3320", name: "Systems Programming II", credits: 3, prereqs: ["CSC 3410"], status: "in-progress" },
-  { code: "MATH 2420", name: "Discrete Math", credits: 3, prereqs: ["MATH 2211"], status: "in-progress" },
-  { code: "CSC 4140", name: "Artificial Intelligence", credits: 3, prereqs: ["CSC 3310", "MATH 3670"], status: "available" },
-  { code: "MATH 3670", name: "Probability & Stats", credits: 3, prereqs: ["MATH 2212"], status: "completed" },
-  { code: "CSC 4810", name: "Computer Networks", credits: 3, prereqs: ["CSC 3410"], status: "completed" },
-  { code: "CSC 4950", name: "Senior Capstone I", credits: 3, prereqs: ["CSC 4350"], status: "locked" },
-  { code: "CSC 4960", name: "Senior Capstone II", credits: 3, prereqs: ["CSC 4950"], status: "locked" },
+type FilterKey = "all" | Availability;
+//  The different filter order
+const filterOrder: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "All courses" },
+  { key: "ready", label: "Ready to take" },
+  { key: "locked", label: "Locked" },
+  { key: "in-progress", label: "In progress" },
+  { key: "completed", label: "Completed" },
 ];
 
-const statusStyle: Record<MapCourse["status"], string> = {
-  completed: "border-green-400 bg-green-50",
-  "in-progress": "border-brand bg-brand/5",
-  available: "border-amber-400 bg-amber-50",
-  locked: "border-gray-300 bg-gray-50 opacity-60",
-};
-
-const statusLabel: Record<MapCourse["status"], string> = {
+const stateLabel: Record<Availability, string> = {
   completed: "Done",
   "in-progress": "In Progress",
-  available: "Available",
+  ready: "Ready to take",
   locked: "Locked",
 };
 
-const badgeStyle: Record<MapCourse["status"], string> = {
+const stateStyle: Record<Availability, string> = {
   completed: "bg-green-100 text-green-700",
   "in-progress": "bg-brand/10 text-brand",
-  available: "bg-amber-100 text-amber-700",
-  locked: "bg-gray-200 text-gray-500",
+  ready: "bg-amber-100 text-amber-700",
+  locked: "bg-gray-100 text-gray-600",
 };
 
-function loadUser(): SessionUser | null {
-  try {
-    const raw = localStorage.getItem(USER_KEY);
-    if (!raw) return null;
-    const user = JSON.parse(raw) as SessionUser;
-    return user && typeof user.name === "string" ? user : null;
-  } catch {
-    return null;
-  }
+/* A small chip for one prerequisite. The mark and the hidden text mean it does not rely on color alone. */
+const chipStyle: Record<CourseStatus, { cls: string; mark: string; text: string }> = {
+  completed: { cls: "bg-green-50 text-green-700", mark: "✓", text: "completed" },
+  "in-progress": { cls: "bg-brand/10 text-brand", mark: "…", text: "in progress" },
+  "not-taken": { cls: "bg-gray-100 text-gray-600", mark: "○", text: "not taken yet" },
+};
+
+function PrereqChip({ course }: { course: CatalogCourse }) {
+  const s = chipStyle[course.status];
+  return (
+    <span className={`inline-block rounded px-2 py-1 text-[11px] font-medium ${s.cls}`}>
+      <span aria-hidden="true">{s.mark} </span>
+      {course.code}
+      <span className="sr-only"> ({s.text})</span>
+    </span>
+  );
+}
+
+function CourseCard({
+  course,
+  open,
+  onToggle,
+}: {
+  course: CatalogCourse;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const state = availability(course);
+  const direct = prereqsOf(course);
+  const missing = missingPrereqs(course);
+  const chain = prereqChain(course.code);
+  const next = unlocks(course.code);
+  const panelId = `panel-${course.code.replace(/\s+/g, "-")}`;
+
+  return (
+    <li className="rounded-md border border-gray-200 bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex min-h-11 w-full cursor-pointer items-start justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-bold">{course.code}</span>
+          <span className="block text-xs text-gray-500">{course.name}</span>
+          {state === "locked" && (
+            <span className="mt-1 block text-[11px] text-gray-500">
+              Needs {missing.map((m) => m.code).join(", ")}
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${stateStyle[state]}`}>
+            {stateLabel[state]}
+          </span>
+          <span className="text-[11px] text-gray-400">{course.credits} cr</span>
+        </span>
+      </button>
+
+      {open && (
+        <div id={panelId} className="border-t border-gray-100 px-4 py-3 text-xs">
+          <p className="mb-1.5 text-[11px] text-gray-500">Requires</p>
+          {direct.length === 0 ? (
+            <p className="text-gray-500">No prerequisites.</p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {direct.map((p) => (
+                <li key={p.code}>
+                  <PrereqChip course={p} />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* The whole path, in the order the courses would be taken */}
+          {chain.length > direct.length && (
+            <>
+              <p className="mb-1.5 mt-3 text-[11px] text-gray-500">Full path, in order</p>
+              <ol className="flex flex-wrap items-center gap-1.5">
+                {chain.map((p) => (
+                  <li key={p.code} className="flex items-center gap-1.5">
+                    <PrereqChip course={p} />
+                    <span aria-hidden="true" className="text-gray-300">
+                      →
+                    </span>
+                  </li>
+                ))}
+                <li className="rounded bg-gray-800 px-2 py-1 text-[11px] font-medium text-white">{course.code}</li>
+              </ol>
+            </>
+          )}
+
+          <p className="mb-1.5 mt-3 text-[11px] text-gray-500">Unlocks</p>
+          {next.length === 0 ? (
+            <p className="text-gray-500">Nothing else depends on this course.</p>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {next.map((n) => (
+                <li key={n.code} className="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-700">
+                  {n.code}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
+  );
 }
 
 export default function MapPage() {
-  const [user] = useState<SessionUser | null>(loadUser);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [user] = useState(loadUser);
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [openCode, setOpenCode] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Prerequisite Map · Sync";
   }, []);
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
-  const selectedCourse = courses.find((c) => c.code === selected);
+  const counts: Record<FilterKey, number> = {
+    all: catalog.length,
+    completed: 0,
+    "in-progress": 0,
+    ready: 0,
+    locked: 0,
+  };
+  for (const course of catalog) counts[availability(course)] += 1;
 
-  /* Which courses need this one as a prereq? */
-  const dependents = selected
-    ? courses.filter((c) => c.prereqs.includes(selected)).map((c) => c.code)
-    : [];
+  /* Courses the student can act on come first, finished ones last */
+  const order: Record<Availability, number> = { ready: 0, locked: 1, "in-progress": 2, completed: 3 };
+  const visible = catalog
+    .filter((c) => filter === "all" || availability(c) === filter)
+    .sort((a, b) => order[availability(a)] - order[availability(b)] || a.code.localeCompare(b.code));
 
   return (
     <>
       <Navbar />
 
-      <main className="mx-auto max-w-250 p-6">
-        <h1 className="mb-1 text-lg font-bold">Prerequisite Map</h1>
-        <p className="mb-5 text-xs text-gray-500">
-          Click a course to see its prerequisites and what it unlocks.
-        </p>
-
-        {/* Legend */}
-        <div className="mb-5 flex flex-wrap gap-3">
-          {(["completed", "in-progress", "available", "locked"] as const).map((s) => (
-            <span key={s} className="flex items-center gap-1.5 text-[11px] text-gray-600">
-              <span className={`inline-block h-2.5 w-2.5 rounded-full border ${statusStyle[s]}`} />
-              {statusLabel[s]}
-            </span>
-          ))}
+      <main className="mx-auto max-w-250 p-4 sm:p-6">
+        <div className="mb-4">
+          <h1 className="text-lg font-bold">Prerequisite Map</h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            See what each course needs, what it unlocks, and which courses you can take now.
+          </p>
         </div>
 
-        {/* Course grid */}
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {courses.map((c) => {
-            const isSelected = selected === c.code;
-            const isPrereq = selectedCourse?.prereqs.includes(c.code);
-            const isDependent = dependents.includes(c.code);
-            const highlight = isSelected
-              ? "ring-2 ring-brand"
-              : isPrereq
-              ? "ring-2 ring-green-400"
-              : isDependent
-              ? "ring-2 ring-amber-400"
-              : "";
-
+        <div role="group" aria-label="Filter courses" className="mb-4 flex flex-wrap items-center gap-2">
+          {filterOrder.map(({ key, label }) => {
+            const active = filter === key;
             return (
               <button
-                key={c.code}
+                key={key}
                 type="button"
-                onClick={() => setSelected(isSelected ? null : c.code)}
-                className={`cursor-pointer rounded-lg border-2 p-3 text-left transition ${statusStyle[c.status]} ${highlight}`}
+                onClick={() => setFilter(key)}
+                aria-pressed={active}
+                className={`min-h-9 cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "border-brand bg-brand text-white"
+                    : "border-gray-300 bg-white text-gray-600 hover:border-gray-500"
+                }`}
               >
-                <p className="text-xs font-bold text-gray-900">{c.code}</p>
-                <p className="mt-0.5 truncate text-[11px] text-gray-500">{c.name}</p>
-                <span
-                  className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${badgeStyle[c.status]}`}
-                >
-                  {statusLabel[c.status]}
-                </span>
+                {label} ({counts[key]})
               </button>
             );
           })}
         </div>
 
-        {/* Detail panel */}
-        {selectedCourse && (
-          <div className="mt-5 rounded-lg border border-gray-200 bg-white px-5 py-4">
-            <h2 className="text-sm font-bold">
-              {selectedCourse.code} — {selectedCourse.name}
-            </h2>
-            <p className="mt-1 text-xs text-gray-500">{selectedCourse.credits} credits</p>
-
-            <div className="mt-3 grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <p className="mb-1 font-semibold text-gray-700">Prerequisites</p>
-                {selectedCourse.prereqs.length === 0 ? (
-                  <p className="text-gray-400">None</p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {selectedCourse.prereqs.map((p) => {
-                      const pc = courses.find((c) => c.code === p);
-                      return (
-                        <li key={p}>
-                          <span className="font-medium">{p}</span>
-                          {pc && (
-                            <span
-                              className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${badgeStyle[pc.status]}`}
-                            >
-                              {statusLabel[pc.status]}
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-              <div>
-                <p className="mb-1 font-semibold text-gray-700">Unlocks</p>
-                {dependents.length === 0 ? (
-                  <p className="text-gray-400">Nothing directly</p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {dependents.map((d) => (
-                      <li key={d} className="font-medium">
-                        {d}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
+        {visible.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center">
+            <p className="text-sm font-medium text-gray-500">No courses match this filter.</p>
           </div>
+        ) : (
+          <ul aria-label="Courses" className="grid items-start gap-3 md:grid-cols-2">
+            {visible.map((course) => (
+              <CourseCard
+                key={course.code}
+                course={course}
+                open={openCode === course.code}
+                onToggle={() => setOpenCode(openCode === course.code ? null : course.code)}
+              />
+            ))}
+          </ul>
         )}
+
+        <p className="mt-6 text-xs">
+          <Link to="/progress" className="text-brand hover:underline">
+            Back to degree progress
+          </Link>
+        </p>
       </main>
     </>
   );

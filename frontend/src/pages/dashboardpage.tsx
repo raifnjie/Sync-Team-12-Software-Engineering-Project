@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar";
+import ProgressBar from "../components/progressbar";
+import { credits } from "../lib/mockdata";
 
 /* Same keys the log in page uses */
 const USER_KEY = "sync_user";
@@ -33,9 +35,6 @@ const upcoming: UpcomingItem[] = [
   },
 ];
 
-/* TODO: replace with the student's real credit hours */
-const credits = { earned: 100, required: 120 };
-
 /* Safely read JSON from localStorage (returns the fallback if anything goes wrong) */
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -63,7 +62,7 @@ function daysUntil(isoDate: string) {
   const target = new Date(isoDate + "T00:00:00");
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
-
+// to change the format of the date
 function formatDate(isoDate: string) {
   return new Date(isoDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -146,7 +145,7 @@ export default function DashboardPage() {
     <>
       <Navbar />
 
-      <main className="mx-auto max-w-250 p-6">
+      <main className="mx-auto max-w-250 p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h1 className="text-lg font-bold">Welcome back, {studentName}!</h1>
           <button
@@ -160,16 +159,10 @@ export default function DashboardPage() {
 
         <section aria-label="Summary" className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="Degree progress" value={`${progress}%`}>
-            <div
-              role="progressbar"
-              aria-label="Degree progress"
-              aria-valuenow={progress}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="mt-2.5 h-1.5 overflow-hidden rounded-sm bg-gray-200"
-            >
-              <div className="h-full bg-brand" style={{ width: `${progress}%` }} />
-            </div>
+            <ProgressBar className="mt-2.5" label="Degree progress" value={progress} />
+            <Link to="/progress" className="mt-2 inline-block text-xs text-brand hover:underline">
+              View details
+            </Link>
           </StatCard>
           {/* Add the different expected graduation, and the current credit hours */}
           <StatCard label="Expected graduation" value="Spring 2027" sub="On track" />
@@ -197,7 +190,7 @@ export default function DashboardPage() {
               return (
                 <div
                   key={course.code}
-                  className="mt-2 flex items-center justify-between gap-3 rounded border border-gray-200 px-3 py-2.5"
+                  className="mt-2 flex flex-col items-start gap-2 rounded border border-gray-200 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                 >
                   <span>
                     {course.code} - {course.name}
@@ -209,7 +202,7 @@ export default function DashboardPage() {
                         type="button"
                         onClick={() => toggleCourse(course.code)}
                         aria-label={`Remove ${course.code} from plan`}
-                        className="cursor-pointer text-brand hover:underline"
+                        className="min-h-8 cursor-pointer text-brand hover:underline"
                       >
                         Undo
                       </button>
@@ -219,7 +212,7 @@ export default function DashboardPage() {
                       type="button"
                       onClick={() => toggleCourse(course.code)}
                       aria-label={`Add ${course.code} to plan`}
-                      className="shrink-0 cursor-pointer text-xs text-brand hover:underline"
+                      className="min-h-8 shrink-0 cursor-pointer text-xs text-brand hover:underline"
                     >
                       Add to plan
                     </button>

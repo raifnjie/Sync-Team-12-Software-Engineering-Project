@@ -1,3 +1,4 @@
+// The ProgressRingProps
 type ProgressRingProps = {
   /* 0 to 100 */
   value: number;

@@ -49,6 +49,7 @@ function fakeRequest() {
   return new Promise<void>((resolve) => setTimeout(resolve, 500));
 }
 
+// The validate function to verify the user input data
 function validate(mode: Mode, v: FormValues): Errors {
   const found: Errors = {};
 
