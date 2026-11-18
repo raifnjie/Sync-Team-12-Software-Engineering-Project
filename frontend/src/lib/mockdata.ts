@@ -25,7 +25,7 @@ export type RequirementCategory = {
   remaining: string[];
   note?: string;
 };
-
+// The Course Catalog
 export const catalog: CatalogCourse[] = [
   { code: "CSC 1301", name: "Introduction to Computer Science", credits: 3, status: "completed", prereqs: [] },
   { code: "CSC 1302", name: "Computer Science II", credits: 3, status: "completed", prereqs: ["CSC 1301"] },
@@ -41,7 +41,7 @@ export const catalog: CatalogCourse[] = [
   { code: "CSC 4730", name: "Operating Systems", credits: 3, status: "not-taken", prereqs: ["CSC 3210", "CSC 3320"] },
   { code: "CSC 4140", name: "Artificial Intelligence", credits: 3, status: "not-taken", prereqs: ["CSC 3310", "MATH 3020"] },
 ];
-
+// The Requirement Category
 export const categories: RequirementCategory[] = [
   { id: "gen-ed", name: "General Education", required: 42, earned: 42, remaining: [] },
   { id: "major-core", name: "Major Core", required: 36, earned: 30, remaining: ["CSC 3320", "CSC 4730"] },
