@@ -3,6 +3,10 @@ import SignInPage from "../pages/signinpage";
 import DashboardPage from "../pages/dashboardpage";
 import TimelinePage from "../pages/timelinepage";
 import RecommendationsPage from "../pages/recommendationspage";
+import ProgressPage from "../pages/progresspage";
+import MapPage from "../pages/mappage";
+import PlanPage from "../pages/planpage";
+import RecsPage from "../pages/recspage";
 
 // The default result on every page not currently built out.
 function ComingSoon() {
@@ -23,8 +27,12 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<SignInPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/progress" element={<ProgressPage />} />
+        <Route path="/map" element={<MapPage />} />
+        <Route path="/plan" element={<PlanPage />} />
+        <Route path="/recs" element={<RecsPage />} />
         <Route path="/timeline" element={<TimelinePage />} />
-        <Route path="/recs" element={<RecommendationsPage />} />
+        <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="*" element={<ComingSoon />} />
       </Routes>
     </BrowserRouter>
