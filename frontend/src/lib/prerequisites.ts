@@ -18,7 +18,7 @@ export function prereqsOf(course: CatalogCourse, catalog: CatalogCourse[] = samp
 export function missingPrereqs(course: CatalogCourse, catalog: CatalogCourse[] = sampleCatalog) {
   return prereqsOf(course, catalog).filter((c) => c.status !== "completed");
 }
-
+// the availability function stating the current status of the course
 export function availability(course: CatalogCourse, catalog: CatalogCourse[] = sampleCatalog): Availability {
   if (course.status === "completed") return "completed";
   if (course.status === "in-progress") return "in-progress";

@@ -1,3 +1,4 @@
+// The different items to import
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import Navbar from "../components/navbar";
@@ -5,11 +6,10 @@ import { catalog, type CatalogCourse, type CourseStatus } from "../lib/mockdata"
 import { availability, missingPrereqs, prereqChain, prereqsOf, unlocks, type Availability } from "../lib/prerequisites";
 import { loadUser } from "../lib/session";
 
-/* TODO: replace the sample catalog in ../lib/mockdata with GET /api/courses and
-   GET /api/courses/:id/prerequisites */
+
 
 type FilterKey = "all" | Availability;
-
+//  The different filter order
 const filterOrder: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All courses" },
   { key: "ready", label: "Ready to take" },

@@ -1,3 +1,4 @@
+// The items to import
 import { catalog as sampleCatalog, type CatalogCourse, type RequirementCategory } from "./mockdata";
 
 /* part / whole as a whole-number percent, kept between 0 and 100 */

@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import SignInPage from "../pages/signinpage";
 import DashboardPage from "../pages/dashboardpage";
-import TimelinePage from "../pages/timelinepage";
 import ProgressPage from "../pages/progresspage";
 import MapPage from "../pages/mappage";
 
@@ -16,7 +15,7 @@ function ComingSoon() {
     </div>
   );
 }
-
+// The App function
 export default function App() {
   return (
     <BrowserRouter>
@@ -26,7 +25,6 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="/map" element={<MapPage />} />
-        <Route path="/timeline" element={<TimelinePage />} />
         <Route path="*" element={<ComingSoon />} />
       </Routes>
     </BrowserRouter>

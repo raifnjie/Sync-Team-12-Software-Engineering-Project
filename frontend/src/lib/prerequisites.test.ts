@@ -4,7 +4,7 @@ import { catalog, categories, credits } from "./mockdata";
 import { remainingCourses, toPercent } from "./progress";
 
 const get = (code: string) => catalog.find((c) => c.code === code)!;
-
+// The prerequisites logic code
 describe("prerequisite logic", () => {
   it("marks a course ready when every prerequisite is completed", () => {
     expect(availability(get("CSC 3320"))).toBe("ready");

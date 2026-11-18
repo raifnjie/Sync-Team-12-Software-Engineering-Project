@@ -62,7 +62,7 @@ function daysUntil(isoDate: string) {
   const target = new Date(isoDate + "T00:00:00");
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
-
+// to change the format of the date
 function formatDate(isoDate: string) {
   return new Date(isoDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

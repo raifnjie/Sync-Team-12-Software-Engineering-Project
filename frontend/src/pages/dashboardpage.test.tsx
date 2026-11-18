@@ -1,3 +1,4 @@
+// The different imports
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -35,7 +36,7 @@ describe("DashboardPage", () => {
 
     expect(screen.getByText("Welcome back, Mike!")).toBeTruthy();
     expect(screen.getByText("0 courses added")).toBeTruthy();
-
+    
     fireEvent.click(screen.getByRole("button", { name: "Add CSC 3320 to plan" }));
 
     expect(screen.getByText("1 course added")).toBeTruthy();

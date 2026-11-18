@@ -7,14 +7,15 @@ import { categories, credits, type CourseStatus } from "../lib/mockdata";
 import { inProgressCredits, remainingCourses, toPercent } from "../lib/progress";
 import { loadUser } from "../lib/session";
 
-/* TODO: replace the sample data in ../lib/mockdata with the student's real data from the backend */
 
+// The sample status labels
 const statusLabel: Record<CourseStatus, string> = {
   completed: "Done",
   "in-progress": "In Progress",
   "not-taken": "Not taken",
 };
 
+// The different status styles
 const statusStyle: Record<CourseStatus, string> = {
   completed: "bg-green-100 text-green-700",
   "in-progress": "bg-brand/10 text-brand",

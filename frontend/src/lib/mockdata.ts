@@ -6,7 +6,7 @@
 
 /* completed = finished, in-progress = taking it now, not-taken = still to do */
 export type CourseStatus = "completed" | "in-progress" | "not-taken";
-
+// The Catalog Course numbers
 export type CatalogCourse = {
   code: string;
   name: string;
