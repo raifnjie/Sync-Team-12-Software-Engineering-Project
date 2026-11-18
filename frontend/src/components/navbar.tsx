@@ -13,7 +13,7 @@ const links = [
 export default function Navbar() {
   return (
     
-    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-6 py-3.5">
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-3.5">
       {/* The app name */}
       <Link to="/dashboard" className="text-base font-bold text-gray-900">
         Sync
@@ -28,7 +28,7 @@ export default function Navbar() {
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              "border-b-2 py-1 text-xs " +
+              "shrink-0 whitespace-nowrap border-b-2 py-2 text-sm md:py-1 md:text-xs " +
               (isActive
                 ? "border-brand font-bold text-gray-900"
                 : "border-transparent text-gray-500 hover:text-gray-900")
@@ -42,7 +42,7 @@ export default function Navbar() {
       <Link
         to="/login"
         aria-label="Account (log out)"
-        className="block h-8 w-8 rounded-full bg-gray-300"
+        className="block h-9 w-9 rounded-full bg-gray-300 md:h-8 md:w-8"
       />
     </header>
   );
