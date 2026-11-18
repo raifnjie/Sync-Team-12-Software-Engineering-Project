@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import Navbar from "../components/navbar";
+import { errorMessage } from "../lib/api";
+import { getProgress, graduationStatus, type Progress } from "../lib/progress";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,114 +26,20 @@ type Semester = {
   courses: Course[];
 };
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Data ─────────────────────────────────────────────────────────────────────
+// Semesters come from GET /api/progress/me: the student's record (completed and
+// in progress), their saved plan, and recommended courses for next term.
 
-// Semester Mock Data
-const semesters: Semester[] = [
-  {
-    id: "fall-2023",
-    label: "Fall 2023",
-    status: "completed",
-    totalCredits: 15,
-    courses: [
-      { code: "CSC 1301", name: "Introduction to Computer Science", credits: 3, status: "completed" },
-      { code: "MATH 1113", name: "Pre-Calculus", credits: 3, status: "completed" },
-      { code: "ENGL 1101", name: "English Composition I", credits: 3, status: "completed" },
-      { code: "HIST 2110", name: "Survey of U.S. History", credits: 3, status: "completed" },
-      { code: "CSC 1010", name: "Computers and Society", credits: 3, status: "completed" },
-    ],
-  },
-  {
-    id: "spring-2024",
-    label: "Spring 2024",
-    status: "completed",
-    totalCredits: 16,
-    courses: [
-      { code: "CSC 1302", name: "Computer Science II", credits: 3, status: "completed" },
-      { code: "MATH 2211", name: "Calculus of One Variable I", credits: 4, status: "completed" },
-      { code: "ENGL 1102", name: "English Composition II", credits: 3, status: "completed" },
-      { code: "CSC 2010", name: "Discrete Structures", credits: 3, status: "completed" },
-      { code: "POLS 1101", name: "American Government", credits: 3, status: "completed" },
-    ],
-  },
-  {
-    id: "fall-2024",
-    label: "Fall 2024",
-    status: "completed",
-    totalCredits: 16,
-    courses: [
-      { code: "CSC 2310", name: "Data Structures", credits: 3, status: "completed" },
-      { code: "MATH 2212", name: "Calculus of One Variable II", credits: 4, status: "completed" },
-      { code: "CSC 2610", name: "Digital Logic", credits: 3, status: "completed" },
-      { code: "CSC 3210", name: "Computer Organization", credits: 3, status: "completed" },
-      { code: "ENGL 2130", name: "American Literature", credits: 3, status: "completed" },
-    ],
-  },
-  {
-    id: "spring-2025",
-    label: "Spring 2025",
-    status: "completed",
-    totalCredits: 15,
-    courses: [
-      { code: "CSC 3310", name: "Design and Analysis of Algorithms", credits: 3, status: "completed" },
-      { code: "CSC 3410", name: "Systems Programming", credits: 3, status: "completed" },
-      { code: "MATH 3670", name: "Probability & Statistics", credits: 3, status: "completed" },
-      { code: "CSC 4720", name: "Database Systems", credits: 3, status: "completed" },
-      { code: "CSC 4510", name: "Theory of Computation", credits: 3, status: "completed" },
-    ],
-  },
-  {
-    id: "fall-2025",
-    label: "Fall 2025",
-    status: "completed",
-    totalCredits: 15,
-    courses: [
-      { code: "CSC 4350", name: "Software Engineering", credits: 3, status: "completed" },
-      { code: "CSC 4330", name: "Programming Languages", credits: 3, status: "completed" },
-      { code: "CSC 4730", name: "Operating Systems", credits: 3, status: "completed" },
-      { code: "CSC 4810", name: "Computer Networks", credits: 3, status: "completed" },
-      { code: "CSC 4900", name: "Technical Elective I", credits: 3, status: "completed" },
-    ],
-  },
-  {
-    id: "spring-2026",
-    label: "Spring 2026",
-    status: "current",
-    totalCredits: 12,
-    courses: [
-      { code: "CSC 4910", name: "Technical Elective II", credits: 3, status: "in-progress" },
-      { code: "CSC 3320", name: "Systems Programming", credits: 3, status: "in-progress" },
-      { code: "MATH 2420", name: "Discrete Math", credits: 3, status: "in-progress" },
-      { code: "CSC 4920", name: "Senior Seminar", credits: 3, status: "in-progress" },
-    ],
-  },
-  {
-    id: "fall-2026",
-    label: "Fall 2026",
-    status: "upcoming",
-    totalCredits: 12,
-    courses: [
-      { code: "MATH 3350", name: "Software Engineering Math", credits: 3, status: "planned" },
-      { code: "MATH 3020", name: "Applied Probability & Stats for CS", credits: 3, status: "planned" },
-      { code: "CSC 4930", name: "Technical Elective III", credits: 3, status: "planned" },
-      { code: "CSC 4140", name: "Artificial Intelligence", credits: 3, status: "recommended" },
-    ],
-  },
-  {
-    id: "spring-2027",
-    label: "Spring 2027",
-    status: "upcoming",
-    totalCredits: 9,
-    courses: [
-      { code: "CSC 4950", name: "Senior Capstone I", credits: 3, status: "planned" },
-      { code: "CSC 4960", name: "Senior Capstone II", credits: 3, status: "recommended" },
-      { code: "CSC 4970", name: "Technical Elective IV", credits: 3, status: "recommended" },
-    ],
-  },
-];
+const USER_KEY = "sync_user";
 
-const TOTAL_CREDITS_REQUIRED = 120;
-const CREDITS_EARNED = 100;
+function loadUserName(): string | null {
+  try {
+    const user = JSON.parse(localStorage.getItem(USER_KEY) ?? "null");
+    return user && typeof user.name === "string" ? user.name : null;
+  } catch {
+    return null;
+  }
+}
 
 // ─── Filter definitions ───────────────────────────────────────────────────────
 
@@ -303,11 +212,37 @@ function EmptyState({ label }: { label: string }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TimelinePage() {
+  const [userName] = useState(loadUserName);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("default");
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const creditsPercent = Math.round((CREDITS_EARNED / TOTAL_CREDITS_REQUIRED) * 100);
+  useEffect(() => {
+    document.title = "Timeline · Sync";
+  }, []);
+
+  useEffect(() => {
+    if (!userName) return;
+    let cancelled = false;
+    getProgress()
+      .then((p) => !cancelled && setProgress(p))
+      .catch((e) => !cancelled && setLoadError(errorMessage(e, "Couldn't load your timeline.")));
+    return () => {
+      cancelled = true;
+    };
+  }, [userName]);
+
+  // Not logged in? Send them to the log in page
+  if (!userName) return <Navigate to="/login" replace />;
+
+  const semesters: Semester[] = progress?.timeline ?? [];
+  const creditsEarned = progress?.credits.earned ?? 0;
+  const creditsRequired = progress?.credits.required ?? 0;
+  const creditsPercent = progress?.percent ?? 0;
   const completedCount = semesters.filter((s) => s.status === "completed").length;
   const remainingCount = semesters.filter((s) => s.status === "upcoming").length;
+  const hasCurrent = semesters.some((s) => s.status === "current");
+  const firstName = userName.split(" ")[0];
 
   const visibleSemesters = filters[activeFilter].apply(semesters);
 
@@ -324,23 +259,35 @@ export default function TimelinePage() {
         <div className="mb-5">
           <h1 className="text-lg font-bold">Degree Timeline</h1>
           <p className="mt-0.5 text-xs text-gray-500">
-            Mike's semester-by-semester plan to graduation
+            {firstName}'s semester-by-semester plan to graduation
           </p>
         </div>
+
+        {loadError && (
+          <p role="alert" className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
+            {loadError}
+          </p>
+        )}
+        {!progress && !loadError && <p className="mb-4 text-xs text-gray-500">Loading your timeline…</p>}
 
         {/* ── Summary cards ── */}
         <section aria-label="Graduation summary" className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-lg border border-gray-200 bg-white px-4 py-3.5">
             <p className="mb-1 text-[11px] text-gray-500">Expected graduation</p>
-            <p className="text-xl font-bold">Spring 2027</p>
-            <p className="mt-0.5 text-xs font-medium text-green-600">On track ✓</p>
+            <p className="text-xl font-bold">{progress?.expectedGraduation.label ?? "–"}</p>
+            {progress && (
+              <p className={`mt-0.5 text-xs font-medium ${progress.onTrack === false ? "text-amber-700" : "text-green-600"}`}>
+                {graduationStatus(progress)}
+                {progress.onTrack ? " ✓" : ""}
+              </p>
+            )}
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-white px-4 py-3.5">
             <p className="mb-1 text-[11px] text-gray-500">Credit hours</p>
             <p className="text-xl font-bold">
-              {CREDITS_EARNED}
-              <span className="text-sm font-normal text-gray-400"> / {TOTAL_CREDITS_REQUIRED}</span>
+              {creditsEarned}
+              <span className="text-sm font-normal text-gray-400"> / {creditsRequired}</span>
             </p>
             <div
               role="progressbar"
@@ -362,8 +309,8 @@ export default function TimelinePage() {
 
           <div className="rounded-lg border border-gray-200 bg-white px-4 py-3.5">
             <p className="mb-1 text-[11px] text-gray-500">Semesters remaining</p>
-            <p className="text-xl font-bold">{remainingCount + 1}</p>
-            <p className="mt-0.5 text-xs text-gray-500">including current</p>
+            <p className="text-xl font-bold">{remainingCount + (hasCurrent ? 1 : 0)}</p>
+            <p className="mt-0.5 text-xs text-gray-500">{hasCurrent ? "including current" : "planned so far"}</p>
           </div>
         </section>
 

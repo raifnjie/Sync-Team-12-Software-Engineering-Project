@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import SignInPage from "../pages/signinpage";
 import DashboardPage from "../pages/dashboardpage";
 import TimelinePage from "../pages/timelinepage";
+import RecommendationsPage from "../pages/recommendationspage";
 import ProgressPage from "../pages/progresspage";
 import MapPage from "../pages/mappage";
 import PlanPage from "../pages/planpage";
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/plan" element={<PlanPage />} />
         <Route path="/recs" element={<RecsPage />} />
         <Route path="/timeline" element={<TimelinePage />} />
+        <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="*" element={<ComingSoon />} />
       </Routes>
     </BrowserRouter>

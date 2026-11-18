@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, test } from "vitest";
+import { afterEach, describe, expect, it, test, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import SignInPage from "./signinpage";
@@ -25,6 +25,7 @@ describe("SignInPage", () => {
   afterEach(() => {
     cleanup();
     localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   // Test 1: Verify default sign in form renders
@@ -51,12 +52,38 @@ describe("SignInPage", () => {
 
   // Test 4: Successful login navigation and storage
   it("logs the user in and opens the dashboard when the form is valid", async () => {
+    // Stand-in for the backend's POST /api/auth/login
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          token: "test-token",
+          user: { id: "u1", name: "Mike Smith", email: "mike.smith@gsu.edu", role: "student" },
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
     renderLoginPage();
     fillAndSubmit("mike.smith@gsu.edu", "password123");
 
     expect(await screen.findByText("Dashboard page")).toBeTruthy();
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/auth\/login$/);
     const saved = JSON.parse(localStorage.getItem("sync_user") ?? "{}");
-    expect(saved.name).toBe("Mike");
+    expect(saved.name).toBe("Mike Smith");
     expect(saved.email).toBe("mike.smith@gsu.edu");
+    expect(localStorage.getItem("sync_token")).toBe("test-token");
+  });
+
+  // Test 5: Wrong password shows the server's message and stays on the page
+  it("shows the server's message when the password is wrong", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Email or password is incorrect." }), { status: 401 }))
+    );
+    renderLoginPage();
+    fillAndSubmit("mike.smith@gsu.edu", "wrong-password");
+
+    expect(await screen.findByText("Email or password is incorrect.")).toBeTruthy();
+    expect(localStorage.getItem("sync_user")).toBeNull();
   });
 });

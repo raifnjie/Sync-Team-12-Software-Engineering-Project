@@ -126,7 +126,7 @@ export default function DashboardPage() {
     .filter((item) => item.days >= 0)
     .sort((a, b) => a.days - b.days)[0];
 
-  // 
+  //
   const visibleUpcoming = upcoming.filter((item) => !item.date || daysUntil(item.date) >= 0);
 
   function toggleCourse(code: string) {

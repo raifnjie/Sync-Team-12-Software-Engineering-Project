@@ -1,0 +1,272 @@
+// Sync database schema (PostgreSQL, Prisma 7).
+// Design notes: docs/database.md
+//
+//   Catalog (shared, maintained by admins):   Course, PrerequisiteGroup, PrerequisiteOption,
+//                                             DegreeProgram, RequirementCategory, RequirementCourse,
+//                                             Opportunity
+//   Per-student data (owned by one User):     AcademicRecord, PlanCourse, DismissedCourse,
+//                                             DismissedOpportunity, SavedOpportunity
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  ADVISOR
+  ADMIN
+}
+
+enum Season {
+  SPRING
+  SUMMER
+  FALL
+}
+
+enum Goal {
+  INDUSTRY
+  GRAD_SCHOOL
+  UNDECIDED
+}
+
+/// COMPLETED counts toward earned credits; IN_PROGRESS is the current term
+enum RecordStatus {
+  COMPLETED
+  IN_PROGRESS
+}
+
+/// ALL_OF: every listed course is required. CREDITS_FROM: any listed courses adding up to creditsRequired.
+enum RequirementKind {
+  ALL_OF
+  CREDITS_FROM
+}
+
+enum OpportunityCategory {
+  POST_GRAD
+  EXPERIENCE
+}
+
+enum OpportunityKind {
+  GRAD_PROGRAM
+  JOB
+  INTERNSHIP
+  RESEARCH
+  CERTIFICATION
+  CLUB
+}
+
+enum ApplicationStatus {
+  SAVED
+  APPLIED
+  ACCEPTED
+  REJECTED
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String
+  passwordHash      String
+  role              Role      @default(STUDENT)
+  // Student profile (FR-1.2). Kept on User: one student has exactly one profile.
+  programId         String?
+  program           DegreeProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  goal              Goal      @default(UNDECIDED)
+  interests         String[]  @default([])
+  maxCreditsPerTerm Int       @default(15)
+  targetSeason      Season?
+  targetYear        Int?
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  records                AcademicRecord[]
+  planCourses            PlanCourse[]
+  dismissedCourses       DismissedCourse[]
+  dismissedOpportunities DismissedOpportunity[]
+  savedOpportunities     SavedOpportunity[]
+
+  @@map("users")
+}
+
+// ─── Catalog ──────────────────────────────────────────────────────────────────
+
+model Course {
+  code         String   @id // e.g. "CSC 4520"
+  name         String
+  credits      Int
+  termsOffered Season[]
+  tags         String[] @default([])
+
+  prerequisiteGroups PrerequisiteGroup[]   @relation("CourseRequirements")
+  satisfies          PrerequisiteOption[]
+  requirementOf      RequirementCourse[]
+  records            AcademicRecord[]
+  planCourses        PlanCourse[]
+  dismissals         DismissedCourse[]
+
+  @@map("courses")
+}
+
+/// One AND-ed prerequisite group of a course. The student needs ANY ONE of its options.
+/// Several groups on the same course are AND-ed: A AND (B OR C) = two groups.
+model PrerequisiteGroup {
+  id                Int     @id @default(autoincrement())
+  courseCode        String
+  course            Course  @relation("CourseRequirements", fields: [courseCode], references: [code], onDelete: Cascade, onUpdate: Cascade)
+  /// true = corequisite: may be taken in the same term
+  concurrentAllowed Boolean @default(false)
+  options           PrerequisiteOption[]
+
+  @@index([courseCode])
+  @@map("prerequisite_groups")
+}
+
+model PrerequisiteOption {
+  groupId    Int
+  group      PrerequisiteGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  courseCode String
+  course     Course            @relation(fields: [courseCode], references: [code], onUpdate: Cascade)
+
+  @@id([groupId, courseCode])
+  @@index([courseCode])
+  @@map("prerequisite_options")
+}
+
+model DegreeProgram {
+  id           String @id // e.g. "bs-cs"
+  name         String
+  totalCredits Int
+
+  categories RequirementCategory[]
+  students   User[]
+
+  @@map("degree_programs")
+}
+
+model RequirementCategory {
+  id              String          @id @default(cuid())
+  programId       String
+  program         DegreeProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  key             String // stable short name, e.g. "electives"
+  name            String
+  kind            RequirementKind
+  creditsRequired Int? // only for CREDITS_FROM
+  position        Int // display order; also the order courses are applied in
+
+  courses RequirementCourse[]
+
+  @@unique([programId, key])
+  @@map("requirement_categories")
+}
+
+model RequirementCourse {
+  categoryId String
+  category   RequirementCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  courseCode String
+  course     Course              @relation(fields: [courseCode], references: [code], onUpdate: Cascade)
+
+  @@id([categoryId, courseCode])
+  @@map("requirement_courses")
+}
+
+model Opportunity {
+  id             String              @id // e.g. "pg-ms-cs"
+  category       OpportunityCategory
+  kind           OpportunityKind
+  title          String
+  organization   String
+  description    String
+  goals          Goal[]
+  tags           String[]            @default([])
+  relatedCourses String[]            @default([]) // course codes; unknown codes are ignored
+  deadline       DateTime?           @db.Date
+  url            String?
+
+  dismissals DismissedOpportunity[]
+  saves      SavedOpportunity[]
+
+  @@map("opportunities")
+}
+
+// ─── Per-student data ─────────────────────────────────────────────────────────
+
+/// Courses a student has completed or is taking now (FR-3)
+model AcademicRecord {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseCode String
+  course     Course       @relation(fields: [courseCode], references: [code], onUpdate: Cascade)
+  status     RecordStatus
+  grade      String?
+  /// Term taken; null for transfer credit
+  season     Season?
+  year       Int?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([userId, courseCode])
+  @@map("academic_records")
+}
+
+/// A course placed in a future term of the student's degree plan (FR-6)
+model PlanCourse {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseCode String
+  course     Course   @relation(fields: [courseCode], references: [code], onDelete: Cascade, onUpdate: Cascade)
+  season     Season
+  year       Int
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, courseCode])
+  @@map("plan_courses")
+}
+
+/// "Not interested" on a course recommendation (FR-7.3)
+model DismissedCourse {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseCode String
+  course     Course   @relation(fields: [courseCode], references: [code], onDelete: Cascade, onUpdate: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, courseCode])
+  @@map("dismissed_courses")
+}
+
+model DismissedOpportunity {
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@id([userId, opportunityId])
+  @@map("dismissed_opportunities")
+}
+
+/// Opportunities a student saved, with application tracking (FR-10.2, FR-10.3)
+model SavedOpportunity {
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String
+  opportunity   Opportunity       @relation(fields: [opportunityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  status        ApplicationStatus @default(SAVED)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@id([userId, opportunityId])
+  @@map("saved_opportunities")
+}

@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { ApiError } from "../lib/api";
+import { login, logout, register, requestPasswordReset } from "../lib/auth";
 
-/* Where the logged-in user is kept in the browser. The dashboard reads the same key. */
+/* Where the logged-in user is kept in the browser (written by lib/auth). The dashboard reads the same key. */
 const USER_KEY = "sync_user";
-/* Remembers the name typed at sign-up so a later log in can greet the user by name. */
-const PROFILES_KEY = "sync_profiles";
 
 /* The three things this page can show */
 type Mode = "login" | "signup" | "reset";
@@ -35,18 +35,6 @@ function readJson<T>(key: string, fallback: T): T {
 function loadUser(): SessionUser | null {
   const user = readJson<SessionUser | null>(USER_KEY, null);
   return user && typeof user.name === "string" ? user : null;
-}
-
-/* "mike.smith@gsu.edu" -> "Mike" (only used when we don't know the user's real name) */
-function nameFromEmail(email: string) {
-  const first = email.split("@")[0].split(/[._-]/)[0];
-  return first.charAt(0).toUpperCase() + first.slice(1);
-}
-
-/* TODO: replace with real calls to the backend:
-   POST /api/auth/login, POST /api/auth/register, POST /api/auth/forgot-password */
-function fakeRequest() {
-  return new Promise<void>((resolve) => setTimeout(resolve, 500));
 }
 
 function validate(mode: Mode, v: FormValues): Errors {
@@ -146,36 +134,36 @@ export default function SignInPage() {
 
     setSubmitting(true);
     try {
-      await fakeRequest();
       const cleanEmail = email.trim().toLowerCase();
 
       if (isReset) {
+        await requestPasswordReset(cleanEmail);
         setResetSent(true);
         return;
       }
 
-      const profiles = readJson<Record<string, string>>(PROFILES_KEY, {});
-      let displayName: string;
+      // Both save the session (token + user) in the browser
       if (isSignUp) {
-        displayName = name.trim();
-        profiles[cleanEmail] = displayName;
-        localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+        await register(name.trim(), cleanEmail, password);
       } else {
-        displayName = profiles[cleanEmail] ?? nameFromEmail(cleanEmail);
+        await login(cleanEmail, password);
       }
-
-      localStorage.setItem(USER_KEY, JSON.stringify({ name: displayName, email: cleanEmail }));
       // "replace" so the Back button doesn't send the user back to the log in form
       navigate("/dashboard", { replace: true });
-    } catch {
-      setErrors({ form: "Something went wrong. Please try again." });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        // Sign-up with an email that already has an account
+        setErrors({ email: error.message });
+      } else {
+        setErrors({ form: error instanceof ApiError ? error.message : "Something went wrong. Please try again." });
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
   function logOut() {
-    localStorage.removeItem(USER_KEY);
+    logout();
     setExisting(null);
   }
 

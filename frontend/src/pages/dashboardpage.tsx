@@ -1,27 +1,23 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import Navbar from "../components/navbar";
+import { errorMessage } from "../lib/api";
+import { logout } from "../lib/auth";
+import { usePlan } from "../lib/usePlan";
+import { getProgress, graduationStatus, type Progress } from "../lib/progress";
+import { getRecommendations, type CourseRecommendation } from "../lib/recommendations";
 
-/* Same keys the log in page uses */
+/* Same key the log in page uses */
 const USER_KEY = "sync_user";
-const PLAN_KEY = "sync_plan";
+/* How many recommended courses the dashboard shows (the rest are on /recs) */
+const RECOMMENDED_COUNT = 4;
 
-/* set the type of values for the course code and the course name */
-type Course = { code: string; name: string };
 type SessionUser = { name: string; email: string };
 /* date is "YYYY-MM-DD". "to" makes the item a link. */
 type UpcomingItem = { label: string; title?: string; date?: string; to?: string; isDeadline?: boolean };
 
-/* The following list of courses on the dashboard */
-const recommended: Course[] = [
-  { code: "CSC 3320", name: "Systems Programming" },
-  { code: "MATH 2420", name: "Discrete Math" },
-  { code: "MATH 3350", name: "Software Engineering" },
-  { code: "MATH 3020", name: "Applied Probability and Statistics for Computer Science" },
-];
-
 /* The announcements bar */
-/* TODO: replace this sample data with the student's real data from the backend */
+/* TODO: replace this sample data with registration dates and saved-opportunity deadlines from the backend */
 const upcoming: UpcomingItem[] = [
   { label: "Registration opens", date: "2026-11-02", to: "/plan" },
   { label: "Advisor commented on your plan", to: "/plan" },
@@ -32,9 +28,6 @@ const upcoming: UpcomingItem[] = [
     isDeadline: true,
   },
 ];
-
-/* TODO: replace with the student's real credit hours */
-const credits = { earned: 100, required: 120 };
 
 /* Safely read JSON from localStorage (returns the fallback if anything goes wrong) */
 function readJson<T>(key: string, fallback: T): T {
@@ -49,11 +42,6 @@ function readJson<T>(key: string, fallback: T): T {
 function loadUser(): SessionUser | null {
   const user = readJson<SessionUser | null>(USER_KEY, null);
   return user && typeof user.name === "string" ? user : null;
-}
-
-function loadPlan(): string[] {
-  const saved = readJson<unknown>(PLAN_KEY, []);
-  return Array.isArray(saved) ? saved.filter((c): c is string => typeof c === "string") : [];
 }
 
 /* Whole days from today until the given "YYYY-MM-DD" date */
@@ -96,20 +84,31 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   // Who is logged in (set by the log in page)
   const [user] = useState<SessionUser | null>(loadUser);
-  // The courses the student added to their plan (kept after a refresh)
-  const [added, setAdded] = useState<string[]>(loadPlan);
+  // The student's plan, saved on the server
+  const { codes: added, toggle: toggleCourse, error: planError } = usePlan(Boolean(user));
+  // Degree progress and recommended courses from the backend
+  const [progressData, setProgressData] = useState<Progress | null>(null);
+  const [recommended, setRecommended] = useState<CourseRecommendation[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "Dashboard · Sync";
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(PLAN_KEY, JSON.stringify(added));
-    } catch {
-      // If the browser blocks storage, the plan just won't be remembered
-    }
-  }, [added]);
+    if (!user) return;
+    let cancelled = false;
+    Promise.all([getProgress(), getRecommendations()])
+      .then(([p, r]) => {
+        if (cancelled) return;
+        setProgressData(p);
+        setRecommended(r.courses.slice(0, RECOMMENDED_COUNT));
+      })
+      .catch((e) => !cancelled && setLoadError(errorMessage(e, "Couldn't load your dashboard.")));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Not logged in? Send them to the log in page instead of showing the dashboard
   if (!user) {
@@ -117,7 +116,8 @@ export default function DashboardPage() {
   }
 
   // The Student's details
-  const progress = Math.round((credits.earned / credits.required) * 100);
+  const credits = progressData?.credits;
+  const progress = progressData?.percent ?? 0;
   const studentName = user.name.split(" ")[0];
 
   // Show the closest deadline
@@ -130,14 +130,8 @@ export default function DashboardPage() {
   // 
   const visibleUpcoming = upcoming.filter((item) => !item.date || daysUntil(item.date) >= 0);
 
-  function toggleCourse(code: string) {
-    setAdded((current) =>
-      current.includes(code) ? current.filter((c) => c !== code) : [...current, code]
-    );
-  }
-
   function logOut() {
-    localStorage.removeItem(USER_KEY);
+    logout();
     // "replace" so the Back button can't return to the dashboard after logging out
     navigate("/login", { replace: true });
   }
@@ -158,8 +152,14 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {loadError && (
+          <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
+            {loadError}
+          </p>
+        )}
+
         <section aria-label="Summary" className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="Degree progress" value={`${progress}%`}>
+          <StatCard label="Degree progress" value={progressData ? `${progress}%` : "–"}>
             <div
               role="progressbar"
               aria-label="Degree progress"
@@ -172,7 +172,11 @@ export default function DashboardPage() {
             </div>
           </StatCard>
           {/* Add the different expected graduation, and the current credit hours */}
-          <StatCard label="Expected graduation" value="Spring 2027" sub="On track" />
+          <StatCard
+            label="Expected graduation"
+            value={progressData?.expectedGraduation.label ?? "–"}
+            sub={progressData ? graduationStatus(progressData) : undefined}
+          />
           <StatCard
             label="Next deadline"
             value={nextDeadline ? (nextDeadline.title ?? nextDeadline.label) : "No deadlines"}
@@ -180,8 +184,8 @@ export default function DashboardPage() {
           />
           <StatCard
             label="Credit hours"
-            value={`${credits.earned} / ${credits.required}`}
-            sub={`${credits.required - credits.earned} to go`}
+            value={credits ? `${credits.earned} / ${credits.required}` : "–"}
+            sub={credits ? `${Math.max(0, credits.required - credits.earned)} to go` : undefined}
           />
         </section>
 
@@ -192,22 +196,36 @@ export default function DashboardPage() {
               {added.length} {added.length === 1 ? "course" : "courses"} added
             </p>
 
-            {recommended.map((course) => {
+            {planError && (
+              <p role="alert" className="mt-2 text-xs text-red-600">
+                {planError}
+              </p>
+            )}
+
+            {recommended === null && !loadError && <p className="mt-2 text-xs text-gray-500">Loading…</p>}
+            {recommended?.length === 0 && (
+              <p className="mt-2 text-xs text-gray-500">No courses to recommend right now.</p>
+            )}
+
+            {(recommended ?? []).map((course) => {
               const isAdded = added.includes(course.code);
               return (
                 <div
                   key={course.code}
                   className="mt-2 flex items-center justify-between gap-3 rounded border border-gray-200 px-3 py-2.5"
                 >
-                  <span>
-                    {course.code} - {course.name}
+                  <span className="min-w-0">
+                    <span className="block">
+                      {course.code} - {course.name}
+                    </span>
+                    {course.reasons[0] && <span className="block text-[11px] text-gray-500">{course.reasons[0]}</span>}
                   </span>
                   {isAdded ? (
                     <span className="flex shrink-0 items-center gap-2 text-xs">
                       <span className="text-gray-500">Added to the plan!</span>
                       <button
                         type="button"
-                        onClick={() => toggleCourse(course.code)}
+                        onClick={() => void toggleCourse(course.code)}
                         aria-label={`Remove ${course.code} from plan`}
                         className="cursor-pointer text-brand hover:underline"
                       >
@@ -217,7 +235,7 @@ export default function DashboardPage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => toggleCourse(course.code)}
+                      onClick={() => void toggleCourse(course.code)}
                       aria-label={`Add ${course.code} to plan`}
                       className="shrink-0 cursor-pointer text-xs text-brand hover:underline"
                     >
